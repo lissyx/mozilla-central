@@ -3715,7 +3715,7 @@ RILNetworkInterface.prototype = {
                  this.apnSetting.apn);
     }
     let radioTechType = this.radioInterface.rilContext.data.type;
-    let radioTechnology = RIL.GECKO_RADIO_TECH.indexOf(radioTechType);
+    let radioTechnology = RIL.RIL_DATACALL_RADIO_TECH_TO_GECKO[radioTechType];
     let authType = RIL.RIL_DATACALL_AUTH_TO_GECKO.indexOf(this.apnSetting.authType);
     // Use the default authType if the value in database is invalid.
     // For the case that user might not select the authentication type.
