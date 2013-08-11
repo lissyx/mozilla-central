@@ -79,6 +79,11 @@ let RILQUIRKS_DATA_REGISTRATION_ON_DEMAND;
 // Ril quirk to control the uicc/data subscription.
 let RILQUIRKS_SUBSCRIPTION_CONTROL;
 
+// HTC Desire Z
+let RILQUIRKS_OLD_RIL_FEATURE_ICCCARDSTATUS;
+let RILQUIRKS_OLD_RIL_FEATURE_DATACALL;
+let RILQUIRKS_OLD_RIL_FEATURE_SIGNALSTRENGTH;
+
 function BufObject(aContext) {
   this.context = aContext;
 }
@@ -5297,9 +5302,9 @@ RilObject.prototype[REQUEST_GET_SIM_STATUS] = function REQUEST_GET_SIM_STATUS(le
   iccStatus.universalPINState = Buf.readInt32(); // CARD_PINSTATE_*
   iccStatus.gsmUmtsSubscriptionAppIndex = Buf.readInt32();
   iccStatus.cdmaSubscriptionAppIndex = Buf.readInt32();
-  if (!this.v5Legacy) {
+  // if (!this.v5Legacy) {
     iccStatus.imsSubscriptionAppIndex = Buf.readInt32();
-  }
+  // }
 
   let apps_length = Buf.readInt32();
   if (apps_length > CARD_MAX_APPS) {
@@ -16104,6 +16109,9 @@ let ContextPool = {
     RILQUIRKS_SEND_STK_PROFILE_DOWNLOAD = quirks.sendStkProfileDownload;
     RILQUIRKS_DATA_REGISTRATION_ON_DEMAND = quirks.dataRegistrationOnDemand;
     RILQUIRKS_SUBSCRIPTION_CONTROL = quirks.subscriptionControl;
+    RILQUIRKS_OLD_RIL_FEATURE_ICCCARDSTATUS = quirks.oldRilIccCardStatus;
+    RILQUIRKS_OLD_RIL_FEATURE_DATACALL = quirks.oldRilDataCall;
+    RILQUIRKS_OLD_RIL_FEATURE_SIGNALSTRENGTH = quirks.oldRilSignalStrength;
   },
 
   setDebugFlag: function(aOptions) {

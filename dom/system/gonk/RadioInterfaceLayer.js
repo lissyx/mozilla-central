@@ -1513,6 +1513,8 @@ WorkerMessenger.prototype = {
   tokenCallbackMap: null,
 
   init: function() {
+    let htcVision = libcutils.property_get("ro.product.device", "") === "vision";
+    let oldRil = libcutils.property_get("ro.telephony.ril.v3", "").split(",");
     let options = {
       debug: DEBUG,
       quirks: {
@@ -1531,7 +1533,13 @@ WorkerMessenger.prototype = {
         sendStkProfileDownload:
           libcutils.property_get("ro.moz.ril.send_stk_profile_dl", "false") == "true",
         dataRegistrationOnDemand: RILQUIRKS_DATA_REGISTRATION_ON_DEMAND,
-        subscriptionControl: RILQUIRKS_SUBSCRIPTION_CONTROL
+        subscriptionControl: RILQUIRKS_SUBSCRIPTION_CONTROL,
+        oldRilIccCardStatus:
+          htcVision || (oldRil.indexOf("icccardstatus") > -1),
+        oldRilDataCall:
+          htcVision || (oldRil.indexOf("datacall") > -1),
+        oldRilSignalStrength:
+          htcVision || (oldRil.indexOf("signalstrength") > -1)
       }
     };
 
