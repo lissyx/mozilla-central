@@ -1897,7 +1897,9 @@ RadioInterface.prototype = {
             prefixLength: prefixLength ? parseInt(prefixLength, 10) : 0
           });
         }
-        message.addresses = addresses;
+        message.dnses = [ libcutils.property_get("net." + message.ifname + ".dns1"),
+                          libcutils.property_get("net." + message.ifname + ".dns2") ];
+        message.gateways = [ libcutils.property_get("net." + message.ifname + ".gw") ];
         connHandler.handleDataCallState(message);
         break;
       case "emergencyCbModeChange":

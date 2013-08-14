@@ -5572,6 +5572,22 @@ RilObject.prototype[REQUEST_SEND_SMS] = function REQUEST_SEND_SMS(length, option
 };
 RilObject.prototype[REQUEST_SEND_SMS_EXPECT_MORE] = null;
 
+RilObject.prototype.readSetupDataCall_v4 = function readSetupDataCall_v4(options, active) {
+  if (!options) {
+    options = {};
+  }
+
+  let [cid, ifname, addresses] = this.context.Buf.readStringList();
+  options.cid = cid;
+  options.ifname = ifname;
+  options.addresses = addresses ? [addresses] : [];;
+  options.dnses = [];
+  options.gateways = [];
+  options.active = active;
+  options.state = GECKO_NETWORK_STATE_CONNECTING;
+  return options;
+};
+
 RilObject.prototype.readSetupDataCall_v5 = function readSetupDataCall_v5(options) {
   if (!options) {
     options = {};
@@ -5594,10 +5610,19 @@ RilObject.prototype[REQUEST_SETUP_DATA_CALL] = function REQUEST_SETUP_DATA_CALL(
     return;
   }
 
+  delete options.rilMessageToken;
+
   if (this.v5Legacy) {
     // Populate the `options` object with the data call information. That way
     // we retain the APN and other info about how the data call was set up.
-    this.readSetupDataCall_v5(options);
+    let Buf = this.context.Buf;
+    let active = Buf.readInt32();
+    if (active != DATACALL_ACTIVE_UP) {
+      Buf.seekIncoming(-1 * Buf.PDU_HEX_OCTET_SIZE);
+      this.readSetupDataCall_v5(options);
+    } else {
+      this.readSetupDataCall_v4(options, active);
+    }
     this.currentDataCalls[options.cid] = options;
     options.rilMessageType = "datacallstatechange";
     this.sendChromeMessage(options);
@@ -6174,6 +6199,31 @@ RilObject.prototype[REQUEST_LAST_DATA_CALL_FAIL_CAUSE] = null;
  *  # dnses     - A space-delimited list of DNS server addresses.
  *  # gateways  - A space-delimited list of default gateway addresses.
  */
+RilObject.prototype.readDataCall_v4 = function(options) {
+  if (!options) {
+    options = {};
+  }
+
+  let Buf = this.context.Buf;
+  options.cid = Buf.readInt32();
+
+  let current = this.currentDataCalls[options.cid];
+  if (!current) {
+    return options;
+  }
+
+  options.active = Buf.readInt32();  // DATACALL_ACTIVE_*
+  options.type = Buf.readString();
+  options.ifname = current.ifname;
+  let addresses = Buf.readString();
+  options.addresses = addresses ? addresses.split(" ") : [];
+  options.gateways = current.gateways;
+  options.dnses = current.dnses;
+  let radioTech = Buf.readInt32();
+  options.status = Buf.readInt32();  // DATACALL_FAIL_*
+  return options;
+};
+
 RilObject.prototype.readDataCall_v5 = function(options) {
   if (!options) {
     options = {};
@@ -6223,14 +6273,16 @@ RilObject.prototype[REQUEST_DATA_CALL_LIST] = function REQUEST_DATA_CALL_LIST(le
 
   let Buf = this.context.Buf;
   let version = 0;
-  if (!this.v5Legacy) {
+  if (!this.v5Legacy || !this.oldRilDataCall) {
     version = Buf.readInt32();
   }
   let num = Buf.readInt32();
   let datacalls = {};
   for (let i = 0; i < num; i++) {
     let datacall;
-    if (version < 6) {
+    if (version < 5) {
+      datacall = this.readDataCall_v4();
+    } else if (version == 5) {
       datacall = this.readDataCall_v5();
     } else {
       datacall = this.readDataCall_v6();
@@ -6995,6 +7047,8 @@ GsmPDUHelperObject.prototype = {
     } else if (nibble >= 97 && nibble <= 102) {
       nibble -= 87; // ASCII 'a'..'f'
     } else {
+      var e = new Error();
+      debug("Nibble threw from: " + e.stack);
       throw "Found invalid nibble during PDU parsing: " +
             String.fromCharCode(nibble);
     }
