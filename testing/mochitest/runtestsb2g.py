@@ -80,7 +80,7 @@ class B2GMochitest(MochitestUtilsMixin):
 
         # interpolate the preferences
         interpolation = { "server": "%s:%s" % (options.webServer, options.httpPort),
-                          "OOP": "true" if self.out_of_process else "false" }
+                          "DISABLE_OOP": "false" if self.out_of_process else "true" }
         prefs = json.loads(json.dumps(prefs) % interpolation)
         for pref in prefs:
             prefs[pref] = Preferences.cast(prefs[pref])

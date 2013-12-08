@@ -30,9 +30,11 @@ endif
 RUN_MOCHITEST_B2G_DESKTOP = \
   rm -f ./$@.log && \
   $(PYTHON) _tests/testing/mochitest/runtestsb2g.py --autorun --close-when-done \
+    --app=$(DIST)/bin/b2g-bin \
     --console-level=INFO --log-file=./$@.log --file-level=INFO \
     --desktop --profile ${GAIA_PROFILE_DIR} \
     --failure-file=$(abspath _tests/testing/mochitest/makefailures.json) \
+    --test-manifest=b2g-desktop.json \
     $(TEST_PATH_ARG) $(EXTRA_TEST_ARGS)
 
 RUN_MOCHITEST = \
