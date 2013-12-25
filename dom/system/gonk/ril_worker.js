@@ -3345,6 +3345,7 @@ RilObject.prototype = {
 
     // This was moved down from CARD_APPSTATE_READY
     this.requestNetworkInfo();
+    this.selectNetworkAuto();
     if (newCardState == GECKO_CARDSTATE_READY) {
       // For type SIM, we need to check EF_phase first.
       // Other types of ICC we can send Terminal_Profile immediately.
