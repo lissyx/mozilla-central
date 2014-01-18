@@ -456,8 +456,12 @@ const ContentPanning = {
 
   _resetActive: function cp_resetActive() {
     let elt = this.pointerDownTarget || this.target;
-    let root = elt.ownerDocument || elt.document;
-    this._setActive(root.documentElement);
+    try {
+      let root = elt.ownerDocument || elt.document;
+      this._setActive(root.documentElement);
+    } catch(e) {
+      Cu.reportError("Exception in resetActive: " + e)
+    }
   },
 
   _resetHover: function cp_resetHover() {
