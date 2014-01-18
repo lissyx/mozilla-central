@@ -351,9 +351,6 @@ mozJSComponentLoader::ReallyInit()
 
     // XXXkhuey B2G child processes have some sort of preferences race that
     // results in getting the wrong value.
-#ifdef MOZ_B2G
-    mReuseLoaderGlobal = true;
-#endif
 
     /*
      * Get the JSRuntime from the runtime svc, if possible.

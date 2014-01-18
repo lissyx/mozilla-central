@@ -743,7 +743,7 @@ pref("network.activity.blipIntervalMilliseconds", 250);
 // can be flipped to false.
 pref("network.gonk.manage-offline-status", true);
 
-pref("jsloader.reuseGlobal", true);
+//pref("jsloader.reuseGlobal", true);
 
 // Enable font inflation for browser tab content.
 pref("font.size.inflation.minTwips", 120);
