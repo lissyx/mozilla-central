@@ -16,6 +16,8 @@ chrome.jar:
   content/devtools.js                   (content/devtools.js)
 #ifndef ANDROID
   content/desktop.js                    (content/desktop.js)
+  content/browser.css                   (content/browser.css)
+  content/images/home.png               (content/images/home.png)
   content/screen.js                     (content/screen.js)
   content/runapp.js                     (content/runapp.js)
 #endif
