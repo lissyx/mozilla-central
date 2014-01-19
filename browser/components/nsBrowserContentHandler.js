@@ -622,8 +622,13 @@ nsBrowserContentHandler.prototype = {
   },
 
   get startPage() {
-    var uri = Services.prefs.getComplexValue("browser.startup.homepage",
-                                             nsIPrefLocalizedString).data;
+    var uri;
+    try {
+      uri = Services.prefs.getComplexValue("browser.startup.homepage",
+                                           nsIPrefLocalizedString).data;
+    } catch(e) {
+      uri = Services.prefs.getCharPref("browser.startup.homepage");
+    }
     if (!uri) {
       Services.prefs.clearUserPref("browser.startup.homepage");
       uri = Services.prefs.getComplexValue("browser.startup.homepage",
