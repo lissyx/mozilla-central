@@ -335,6 +335,7 @@ var shell = {
 
     CustomEventManager.init();
     WebappsHelper.init();
+    AlertsHelper.init();
     UserAgentOverrides.init();
     IndexedDBPromptHelper.init();
     CaptivePortalLoginHelper.init();
@@ -783,6 +784,11 @@ var AlertsHelper = {
   _listeners: {},
   _count: 0,
 
+  init: function () {
+    Services.obs.addObserver(this, "alert-service-show", false);
+    Services.obs.addObserver(this, "alert-service-close", false);
+  },
+
   handleEvent: function alert_handleEvent(detail) {
     if (!detail || !detail.id)
       return;
@@ -961,6 +967,16 @@ var AlertsHelper = {
                           data.uid, details.dir,
                           details.lang, details.manifestURL);
   },
+
+  observe: function alert_observe(subject, topic, data) {
+    if (topic == "alert-service-show") {
+      let args = JSON.parse(data);
+      AlertsHelper.showAlertNotification.apply(AlertsHelper, args);
+    } else if (topic == "alert-service-close") {
+      let name = data;
+      AlertsHelper.closeAlert(name);
+    }
+  }
 }
 
 var WebappsHelper = {
