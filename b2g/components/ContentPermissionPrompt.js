@@ -44,6 +44,9 @@ XPCOMUtils.defineLazyServiceGetter(this,
                                    "@mozilla.org/telephony/audiomanager;1",
                                    "nsIAudioManager");
 
+XPCOMUtils.defineLazyModuleGetter(this, "SystemApp",
+                                  "resource://gre/modules/SystemApp.jsm");
+
 /**
  * aTypesInfo is an array of {permission, access, action, deny} which keeps
  * the information of each permission. This arrary is initialized in
@@ -351,13 +354,8 @@ ContentPermissionPrompt.prototype = {
   },
 
   sendToBrowserWindow: function(type, request, requestId, typesInfo, callback) {
-    let browser = Services.wm.getMostRecentWindow("navigator:browser");
-    let content = browser.getContentWindow();
-    if (!content)
-      return;
-
     if (callback) {
-      content.addEventListener("mozContentEvent", function contentEvent(evt) {
+      SystemApp.addEventListener("mozContentEvent", function contentEvent(evt) {
         let detail = evt.detail;
         if (detail.id != requestId)
           return;
@@ -389,12 +387,12 @@ ContentPermissionPrompt.prototype = {
     };
 
     if (!isApp) {
-      browser.shell.sendChromeEvent(details);
+      SystemApp.sendChromeEvent(details);
       return;
     }
 
     details.manifestURL = DOMApplicationRegistry.getManifestURLByLocalId(principal.appId);
-    browser.shell.sendChromeEvent(details);
+    SystemApp.sendChromeEvent(details);
   },
 
   classID: Components.ID("{8c719f03-afe0-4aac-91ff-6c215895d467}"),

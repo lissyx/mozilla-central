@@ -46,6 +46,9 @@ XPCOMUtils.defineLazyServiceGetter(Services, "settings",
                                    "@mozilla.org/settingsService;1",
                                    "nsISettingsService");
 
+XPCOMUtils.defineLazyModuleGetter(this, "SystemApp",
+                                  "resource://gre/modules/SystemApp.jsm");
+
 function UpdateCheckListener(updatePrompt) {
   this._updatePrompt = updatePrompt;
 }
@@ -118,7 +121,6 @@ UpdatePrompt.prototype = {
   _applyPromptTimer: null,
   _waitingForIdle: false,
   _updateCheckListner: null,
-  _pendingEvents: [],
 
   get applyPromptTimeout() {
     return Services.prefs.getIntPref(PREF_APPLY_PROMPT_TIMEOUT);
@@ -128,14 +130,8 @@ UpdatePrompt.prototype = {
     return Services.prefs.getIntPref(PREF_APPLY_IDLE_TIMEOUT);
   },
 
-  handleContentStart: function UP_handleContentStart(shell) {
-    let content = shell.contentBrowser.contentWindow;
-    content.addEventListener("mozContentEvent", this);
-
-    for (let i = 0; i < this._pendingEvents.length; i++) {
-      shell.sendChromeEvent(this._pendingEvents[i]);
-    }
-    this._pendingEvents.length = 0;
+  handleContentStart: function UP_handleContentStart() {
+    SystemApp.addEventListener("mozContentEvent", this);
   },
 
   // nsIUpdatePrompt
@@ -214,8 +210,7 @@ UpdatePrompt.prototype = {
     }
 
 #ifdef MOZ_B2G_RIL
-    let window = Services.wm.getMostRecentWindow("navigator:browser");
-    let pinReq = window.navigator.mozIccManager.getCardLock("pin");
+    let pinReq = SystemApp.navigator.mozIccManager.getCardLock("pin");
     pinReq.onsuccess = function(e) {
       if (e.target.result.enabled) {
         // The SIM is pin locked. Don't use a fallback timer. This means that
@@ -271,15 +266,12 @@ UpdatePrompt.prototype = {
     let detail = aDetail || {};
     detail.type = aType;
 
-    let browser = Services.wm.getMostRecentWindow("navigator:browser");
-    if (!browser) {
-      this._pendingEvents.push(detail);
+    let sent = SystemApp.sendChromeEvent(detail);
+    if (!sent) {
       log("Warning: Couldn't send update event " + aType +
           ": no content browser. Will send again when content becomes available.");
       return false;
     }
-
-    browser.shell.sendChromeEvent(detail);
     return true;
   },
 

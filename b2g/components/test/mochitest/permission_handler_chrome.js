@@ -13,38 +13,19 @@ const Ci = Components.interfaces;
 const Cu = Components.utils;
 
 const { Services } = Cu.import("resource://gre/modules/Services.jsm");
+const { SystemApp } = Cu.import("resource://gre/modules/SystemApp.jsm");
 
-let browser = Services.wm.getMostRecentWindow("navigator:browser");
-let shell;
-
-function loadShell() {
-  if (!browser) {
-    debug("no browser");
-    return false;
+let eventHandler = function(evt) {
+  if (!evt.detail || evt.detail.type !== "permission-prompt") {
+    return;
   }
-  shell = browser.shell;
-  return true;
-}
 
-function getContentWindow() {
-  return shell.contentBrowser.contentWindow;
-}
+  sendAsyncMessage("permission-request", evt.detail.permissions);
+};
 
-if (loadShell()) {
-  let content = getContentWindow();
-  let eventHandler = function(evt) {
-    if (!evt.detail || evt.detail.type !== "permission-prompt") {
-      return;
-    }
+SystemApp.addEventListener("mozChromeEvent", eventHandler);
 
-    sendAsyncMessage("permission-request", evt.detail.permissions);
-  };
-
-  content.addEventListener("mozChromeEvent", eventHandler);
-
-  // need to remove ChromeEvent listener after test finished.
-  addMessageListener("teardown", function() {
-    content.removeEventListener("mozChromeEvent", eventHandler);
-  });
-}
-
+// need to remove ChromeEvent listener after test finished.
+addMessageListener("teardown", function() {
+  SystemApp.removeEventListener("mozChromeEvent", eventHandler);
+});

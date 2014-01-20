@@ -333,6 +333,9 @@ var shell = {
     window.addEventListener('unload', this);
     this.contentBrowser.addEventListener('mozbrowserloadstart', this, true);
 
+    Cu.import('resource://gre/modules/SystemApp.jsm');
+    SystemApp.registerFrame(this.contentBrowser);
+
     CustomEventManager.init();
     WebappsHelper.init();
     AlertsHelper.init();
@@ -661,6 +664,7 @@ var shell = {
 
       Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
 
+      SystemApp.setIsLoaded();
       if ('pendingChromeEvents' in shell) {
         shell.pendingChromeEvents.forEach((shell.sendChromeEvent).bind(shell));
       }

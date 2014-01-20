@@ -16,6 +16,9 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "ppmm",
   "@mozilla.org/parentprocessmessagemanager;1", "nsIMessageBroadcaster");
 
+XPCOMUtils.defineLazyModuleGetter(this, "SystemApp",
+                                  "resource://gre/modules/SystemApp.jsm");
+
 this.Keyboard = {
   _formMM: null,     // The current web page message manager.
   _keyboardMM: null, // The keyboard app message manager.
@@ -210,7 +213,7 @@ this.Keyboard = {
 
     // Chrome event, used also to render value selectors; that's why we need
     // the info about choices / min / max here as well...
-    this.sendChromeEvent({
+    SystemApp.sendChromeEvent({
       type: 'inputmethod-contextchange',
       inputType: msg.data.type,
       value: msg.data.value,
@@ -245,13 +248,13 @@ this.Keyboard = {
   },
 
   showInputMethodPicker: function keyboardShowInputMethodPicker() {
-    this.sendChromeEvent({
+    SystemApp.sendChromeEvent({
       type: "inputmethod-showall"
     });
   },
 
   switchToNextInputMethod: function keyboardSwitchToNextInputMethod() {
-    this.sendChromeEvent({
+    SystemApp.sendChromeEvent({
       type: "inputmethod-next"
     });
   },
@@ -291,13 +294,6 @@ this.Keyboard = {
     this._layouts = layouts;
 
     this.sendToKeyboard('Keyboard:LayoutsChange', layouts);
-  },
-
-  sendChromeEvent: function(event) {
-    let browser = Services.wm.getMostRecentWindow("navigator:browser");
-    if (browser && browser.shell) {
-      browser.shell.sendChromeEvent(event);;
-    }
   }
 };
 
