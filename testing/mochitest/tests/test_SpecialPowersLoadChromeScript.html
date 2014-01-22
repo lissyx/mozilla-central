@@ -14,12 +14,64 @@ SimpleTest.waitForExplicitFinish();
 var url = SimpleTest.getTestFileURL("SpecialPowersLoadChromeScript.js");
 var script = SpecialPowers.loadChromeScript(url);
 
+var originalTestRunner = top.TestRunner;
+
 var MESSAGE = { bar: true };
 script.addMessageListener("bar", function (message) {
-  is(JSON.stringify(message), JSON.stringify(MESSAGE));
+  is(JSON.stringify(message), JSON.stringify(MESSAGE),
+     "received back message from the chrome script");
+
+  checkAssert();
+});
+
+function checkAssert() {
+  // Overload TestRunner to catch reports being made
+  // by the chrome script
+  var n = 0;
+  function checkTestRunnerCalls(type, value) {
+    switch(n++) {
+      case 0:
+        is(type, "log");
+        ok(value.match(/TEST-PASS \| .+SpecialPowersLoadChromeScript\.js \| valid assertion/),
+           "got first assert");
+        break;
+      case 1:
+        is(type, "addFailedTest");
+        ok(value.indexOf("SpecialPowersLoadChromeScript\.js") != -1,
+           "reports chrome script url");
+        break;
+      case 2:
+        is(type, "error")
+        ok(value.match(/TEST-UNEXPECTED-FAIL \| .+SpecialPowersLoadChromeScript\.js \| invalid assertion - got false, expected true \(operator ==\)/),
+           "got second assert");
+        break;
+      case 3:
+        is(type, "addFailedTest");
+        ok(value.indexOf("SpecialPowersLoadChromeScript\.js") != -1,
+           "reports chrome script url");
+        break;
+      case 4:
+        is(type, "error");
+        ok(value.match(/TEST-UNEXPECTED-FAIL \| .+SpecialPowersLoadChromeScript\.js \| invalid equal assertion - got 1, expected 2 \(operator ==\)/),
+           "got thrid and last assert");
+
+        endOfTest();
+        break;
+    }
+  }
+  top.TestRunner = {
+    log: checkTestRunnerCalls.bind(null, "log"),
+    addFailedTest: checkTestRunnerCalls.bind(null, "addFailedTest"),
+    error: checkTestRunnerCalls.bind(null, "error")
+  };
+  script.sendAsyncMessage("assert");
+}
+
+function endOfTest() {
+  top.TestRunner = originalTestRunner;
   script.destroy();
   SimpleTest.finish();
-});
+}
 
 script.sendAsyncMessage("foo", MESSAGE);
 </script>
