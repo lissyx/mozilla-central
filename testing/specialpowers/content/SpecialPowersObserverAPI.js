@@ -345,6 +345,18 @@ SpecialPowersObserverAPI.prototype = {
 
         var jsScript = this._readUrlAsString(url);
 
+        var status;
+        try {
+          channel.QueryInterface(Ci.nsIHttpChannel);
+          status = channel.responseStatus;
+        }catch(e) {}
+        if (status == 404) {
+          throw new SpecialPowersException(
+            "Error while executing chrome script '" + url + "':\n" +
+            "The script doesn't exists. Ensure registering it in " +
+            "your mochitest.ini file, in `supports-file` section.");
+        }
+
         // Setup a chrome sandbox that has access to sendAsyncMessage
         // and addMessageListener in order to communicate with
         // the mochitest.
