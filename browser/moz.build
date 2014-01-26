@@ -27,5 +27,12 @@ if CONFIG['MOZ_METRO']:
 if CONFIG['MAKENSISU']:
     DIRS += ['installer/windows']
 
+if CONFIG['MOZ_MULET']:
+    PARALLEL_DIRS += [
+        '../b2g/chrome',
+        '../b2g/components',
+        '../b2g/locales'
+    ]
+
 DIST_SUBDIR = 'browser'
 export('DIST_SUBDIR')

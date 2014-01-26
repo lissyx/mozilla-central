@@ -7386,6 +7386,25 @@ fi
 AC_SUBST(MOZ_B2G_CERTDATA)
 
 dnl ========================================================
+dnl = Enable Firefox Mulet (Browser with MOZ_B2G)
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(mulet,
+[  --enable-mulet      Building a Firefox Mulet ],
+    MOZ_MULET=1,
+    MOZ_MULET= )
+if test -n "$MOZ_MULET"; then
+  if test "$MOZ_BUILD_APP" = "browser"; then
+    AC_DEFINE(MOZ_MULET)
+    MOZ_B2G=1
+    AC_DEFINE(MOZ_B2G)
+  else
+    AC_MSG_ERROR([mulet cannot be enabled with other apps than browser.])
+  fi
+fi
+AC_SUBST(MOZ_MULET)
+AC_SUBST(MOZ_B2G)
+
+dnl ========================================================
 dnl = Enable Support for Payment API
 dnl ========================================================
 if test -n "$MOZ_PAY"; then

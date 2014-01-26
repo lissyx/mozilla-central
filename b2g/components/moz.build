@@ -42,3 +42,10 @@ EXTRA_JS_MODULES += [
     'TelURIParser.jsm',
     'WebappsUpdater.jsm',
 ]
+
+# When building the mulet, this moz.build is being
+# referenced from browser/moz.build, which set
+# DIST_SUBDIR='browser' whereas we don't expect
+# to put b2g components in a sub dir
+if CONFIG['MOZ_MULET']:
+    DIST_SUBDIR = ''
