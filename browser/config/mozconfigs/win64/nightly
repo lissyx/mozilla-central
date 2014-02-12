@@ -4,6 +4,8 @@
 ac_add_options --enable-signmar
 ac_add_options --enable-profiling
 
+ac_add_options --enable-mulet
+
 # Nightlies only since this has a cost in performance
 ac_add_options --enable-js-diagnostics
 
