@@ -81,7 +81,7 @@ def _repack(app_finder, l10n_finder, copier, formatter, non_chrome=set()):
     paths = dict((e.path,
                   l10n_paths[mozpack.path.basedir(e.path, app.bases)][e.name])
                  for e in app.entries
-                 if isinstance(e, ManifestEntryWithRelPath))
+                 if isinstance(e, ManifestEntryWithRelPath) and e.name != 'b2g-l10n')
 
     for pattern in non_chrome:
         for base in app.bases:
