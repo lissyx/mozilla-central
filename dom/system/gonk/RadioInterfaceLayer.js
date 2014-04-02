@@ -213,7 +213,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gTelephonyProvider",
 
 XPCOMUtils.defineLazyGetter(this, "WAP", function() {
   let wap = {};
-  Cu.import("resource://gre/modules/WapPushManager.js", wap);
+  //Cu.import("resource://gre/modules/WapPushManager.js", wap);
   return wap;
 });
 
@@ -989,6 +989,10 @@ XPCOMUtils.defineLazyGetter(this, "gDataConnectionManager", function () {
 // property.
 try {
   Services.prefs.setIntPref(kPrefRilNumRadioInterfaces, (function() {
+    try {
+      return Services.prefs.getIntPref("ril.libriljs.numInterfaces");
+    } catch(e) {}
+
     // When Gonk property "ro.moz.ril.numclients" is not set, return 1; if
     // explicitly set to any number larger-equal than 0, return num; else, return
     // 1 for compatibility.
@@ -3429,10 +3433,14 @@ RadioInterface.prototype = {
         } else {
           // Set a sane minimum time.
           let buildTime = libcutils.property_get("ro.build.date.utc", "0") * 1000;
-          let file = FileUtils.File("/system/b2g/b2g");
-          if (file.lastModifiedTime > buildTime) {
-            buildTime = file.lastModifiedTime;
-          }
+
+          try {
+            let file = FileUtils.File("/system/b2g/b2g");
+            if (file.lastModifiedTime > buildTime) {
+              buildTime = file.lastModifiedTime;
+            }
+          } catch(e) {}
+
           if (buildTime > Date.now()) {
             gTimeService.set(buildTime);
           }

@@ -30,32 +30,38 @@ XPIDL_SOURCES += [
 
 XPIDL_MODULE = 'dom_system_gonk'
 
-EXPORTS += [
-    'GonkGPSGeolocationProvider.h',
-    'nsVolume.h',
-    'nsVolumeService.h',
-]
 SOURCES += [
-    'AudioChannelManager.cpp',
-    'AudioManager.cpp',
-    'AutoMounter.cpp',
-    'AutoMounterSetting.cpp',
-    'GonkGPSGeolocationProvider.cpp',
-    'NetworkUtils.cpp',
-    'NetworkWorker.cpp',
-    'nsVolume.cpp',
-    'nsVolumeMountLock.cpp',
-    'nsVolumeService.cpp',
-    'nsVolumeStat.cpp',
-    'OpenFileFinder.cpp',
     'SystemWorkerManager.cpp',
-    'TimeZoneSettingObserver.cpp',
-    'Volume.cpp',
-    'VolumeCommand.cpp',
-    'VolumeManager.cpp',
-    'VolumeServiceIOThread.cpp',
-    'VolumeServiceTest.cpp',
 ]
+EXPORTS += [
+]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
+    EXPORTS += [
+        'GonkGPSGeolocationProvider.h',
+        'nsVolume.h',
+        'nsVolumeService.h',
+    ]
+    SOURCES += [
+        'AudioChannelManager.cpp',
+        'AudioManager.cpp',
+        'AutoMounter.cpp',
+        'AutoMounterSetting.cpp',
+        'GonkGPSGeolocationProvider.cpp',
+        'NetworkUtils.cpp',
+        'NetworkWorker.cpp',
+        'nsVolume.cpp',
+        'nsVolumeMountLock.cpp',
+        'nsVolumeService.cpp',
+        'nsVolumeStat.cpp',
+        'OpenFileFinder.cpp',
+        'TimeZoneSettingObserver.cpp',
+        'Volume.cpp',
+        'VolumeCommand.cpp',
+        'VolumeManager.cpp',
+        'VolumeServiceIOThread.cpp',
+        'VolumeServiceTest.cpp',
+    ]
 
 if CONFIG['ENABLE_TESTS']:
     XPCSHELL_TESTS_MANIFESTS += ['tests/xpcshell.ini']

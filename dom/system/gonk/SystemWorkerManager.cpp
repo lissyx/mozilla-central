@@ -18,7 +18,9 @@
 #include "SystemWorkerManager.h"
 
 #include "nsINetworkService.h"
+#ifdef MOZ_WIDGET_GONK
 #include "nsIWifi.h"
+#endif
 #include "nsIWorkerHolder.h"
 #include "nsIXPConnect.h"
 
@@ -26,14 +28,18 @@
 #include "mozilla/dom/workers/Workers.h"
 #include "AutoMounter.h"
 #include "TimeZoneSettingObserver.h"
+#ifdef MOZ_WIDGET_GONK
 #include "AudioManager.h"
+#endif
 #ifdef MOZ_B2G_RIL
 #include "mozilla/ipc/Ril.h"
 #endif
 #ifdef MOZ_NFC
 #include "mozilla/ipc/Nfc.h"
 #endif
+#ifdef MOZ_WIDGET_GONK
 #include "mozilla/ipc/KeyStore.h"
+#endif
 #include "nsIObserverService.h"
 #include "nsCxPusher.h"
 #include "nsServiceManagerUtils.h"
@@ -84,7 +90,9 @@ SystemWorkerManager::Init()
 
   mozilla::AutoSafeJSContext cx;
 
-  nsresult rv = InitWifi(cx);
+  nsresult rv;
+#ifdef MOZ_WIDGET_GONK
+  rv = InitWifi(cx);
   if (NS_FAILED(rv)) {
     NS_WARNING("Failed to initialize WiFi Networking!");
     return rv;
@@ -96,6 +104,7 @@ SystemWorkerManager::Init()
   InitializeTimeZoneSettingObserver();
   nsCOMPtr<nsIAudioManager> audioManager =
     do_GetService(NS_AUDIOMANAGER_CONTRACTID);
+#endif
 
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
   if (!obs) {
@@ -119,7 +128,9 @@ SystemWorkerManager::Shutdown()
 
   mShutdown = true;
 
+#ifdef MOZ_WIDGET_GONK
   ShutdownAutoMounter();
+#endif
 
 #ifdef MOZ_B2G_RIL
   RilConsumer::Shutdown();
@@ -129,11 +140,15 @@ SystemWorkerManager::Shutdown()
   NfcConsumer::Shutdown();
 #endif
 
+#ifdef MOZ_WIDGET_GONK
+  mNetdWorker = nullptr;
+
   nsCOMPtr<nsIWifi> wifi(do_QueryInterface(mWifiWorker));
   if (wifi) {
     wifi->Shutdown();
     wifi = nullptr;
   }
+#endif
   mWifiWorker = nullptr;
 
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
@@ -175,10 +190,12 @@ SystemWorkerManager::GetInterface(const nsIID &aIID, void **aResult)
 {
   NS_ASSERTION(NS_IsMainThread(), "Wrong thread!");
 
+#ifdef MOZ_WIDGET_GONK
   if (aIID.Equals(NS_GET_IID(nsIWifi))) {
     return CallQueryInterface(mWifiWorker,
                               reinterpret_cast<nsIWifi**>(aResult));
   }
+#endif
 
   NS_WARNING("Got nothing for the requested IID!");
   return NS_ERROR_NO_INTERFACE;
@@ -229,6 +246,16 @@ SystemWorkerManager::RegisterNfcWorker(JS::Handle<JS::Value> aWorker,
 #endif // MOZ_NFC
 }
 
+#ifdef MOZ_WIDGET_GONK
+nsresult
+SystemWorkerManager::InitNetd(JSContext *cx)
+{
+  nsCOMPtr<nsIWorkerHolder> worker = do_GetService("@mozilla.org/network/service;1");
+  NS_ENSURE_TRUE(worker, NS_ERROR_FAILURE);
+  mNetdWorker = worker;
+  return NS_OK;
+}
+
 nsresult
 SystemWorkerManager::InitWifi(JSContext *cx)
 {
@@ -245,6 +272,7 @@ SystemWorkerManager::InitKeyStore(JSContext *cx)
   mKeyStore = new KeyStore();
   return NS_OK;
 }
+#endif
 
 NS_IMPL_ISUPPORTS(SystemWorkerManager,
                   nsIObserver,

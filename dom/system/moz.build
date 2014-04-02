@@ -14,8 +14,7 @@ elif toolkit == 'cocoa':
     DIRS += ['mac']
 elif toolkit == 'android':
     DIRS += ['android']
-elif toolkit == 'gonk':
-    DIRS += ['gonk']
+DIRS += ['gonk']
 
 TEST_DIRS += ['tests']
 
