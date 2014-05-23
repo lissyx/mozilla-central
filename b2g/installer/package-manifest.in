@@ -175,9 +175,9 @@
 @RESPATH@/components/dom_system.xpt
 #ifdef MOZ_WIDGET_GONK
 @RESPATH@/components/dom_wifi.xpt
-@RESPATH@/components/dom_system_gonk.xpt
 #endif
 #ifdef MOZ_B2G_RIL
+@RESPATH@/components/dom_system_gonk.xpt
 @RESPATH@/components/dom_icc.xpt
 @RESPATH@/components/dom_wappush.xpt
 @RESPATH@/components/dom_mobileconnection.xpt
@@ -437,12 +437,19 @@
 @RESPATH@/components/UiccConnector.manifest
 #endif
 
-; WiFi, NetworkManager, NetworkStats
+; WiFi
 #ifdef MOZ_WIDGET_GONK
 @RESPATH@/components/DOMWifiManager.js
 @RESPATH@/components/DOMWifiManager.manifest
 @RESPATH@/components/DOMWifiP2pManager.js
 @RESPATH@/components/DOMWifiP2pManager.manifest
+@RESPATH@/components/TetheringService.js
+@RESPATH@/components/TetheringService.manifest
+@RESPATH@/components/WifiWorker.js
+@RESPATH@/components/WifiWorker.manifest
+#endif // MOZ_WIDGET_GONK
+
+#if defined(MOZ_B2G_RIL)
 @RESPATH@/components/NetworkInterfaceListService.js
 @RESPATH@/components/NetworkInterfaceListService.manifest
 @RESPATH@/components/NetworkManager.js
@@ -453,11 +460,7 @@
 @RESPATH@/components/NetworkStatsManager.manifest
 @RESPATH@/components/NetworkStatsServiceProxy.js
 @RESPATH@/components/NetworkStatsServiceProxy.manifest
-@RESPATH@/components/TetheringService.js
-@RESPATH@/components/TetheringService.manifest
-@RESPATH@/components/WifiWorker.js
-@RESPATH@/components/WifiWorker.manifest
-#endif // MOZ_WIDGET_GONK
+#endif // MOZ_B2G_RIL
 
 ; Camera
 #ifdef MOZ_B2G_CAMERA
@@ -480,7 +483,7 @@
 #endif // MOZ_WIDGET_GONK
 
 ; RIL
-#if defined(MOZ_WIDGET_GONK) && defined(MOZ_B2G_RIL)
+#if defined(MOZ_B2G_RIL)
 @RESPATH@/components/CellBroadcastService.js
 @RESPATH@/components/CellBroadcastService.manifest
 @RESPATH@/components/MmsService.js
@@ -507,7 +510,7 @@
 @RESPATH@/components/VoicemailService.js
 @RESPATH@/components/VoicemailService.manifest
 #endif
-#endif // MOZ_WIDGET_GONK && MOZ_B2G_RIL
+#endif // MOZ_B2G_RIL
 
 #ifndef MOZ_WIDGET_GONK
 @RESPATH@/components/extensions.manifest

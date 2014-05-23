@@ -29,7 +29,7 @@
 
 // Service instantiation
 #include "ipc/TelephonyIPCService.h"
-#if defined(MOZ_WIDGET_GONK) && defined(MOZ_B2G_RIL)
+#if defined(MOZ_B2G_RIL)
 #include "nsIGonkTelephonyService.h"
 #endif
 #include "nsXULAppAPI.h" // For XRE_GetProcessType()

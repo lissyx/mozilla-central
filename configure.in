@@ -7505,11 +7505,7 @@ MOZ_ARG_ENABLE_BOOL(b2g-ril,
     MOZ_B2G_RIL=,
     MOZ_B2G_RIL=$_PLATFORM_HAVE_RIL )
 if test -n "$MOZ_B2G_RIL"; then
-    if test -n "$_PLATFORM_HAVE_RIL"; then
-        AC_DEFINE(MOZ_B2G_RIL)
-    else
-        AC_MSG_ERROR([b2g-ril cannot be enabled because target platform doesn't support it.])
-    fi
+    AC_DEFINE(MOZ_B2G_RIL)
 fi
 AC_SUBST(MOZ_B2G_RIL)
 

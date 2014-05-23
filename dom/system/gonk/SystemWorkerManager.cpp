@@ -18,7 +18,9 @@
 #include "SystemWorkerManager.h"
 
 #include "nsINetworkService.h"
+#ifdef MOZ_WIDGET_GONK
 #include "nsIWifi.h"
+#endif
 #include "nsIWorkerHolder.h"
 #include "nsIXPConnect.h"
 
@@ -26,12 +28,14 @@
 #include "mozilla/dom/workers/Workers.h"
 #include "AutoMounter.h"
 #include "TimeZoneSettingObserver.h"
+#ifdef MOZ_WIDGET_GONK
 #include "AudioManager.h"
 #include "mozilla/dom/ScriptSettings.h"
+#include "mozilla/ipc/KeyStore.h"
+#endif
 #ifdef MOZ_B2G_RIL
 #include "mozilla/ipc/Ril.h"
 #endif
-#include "mozilla/ipc/KeyStore.h"
 #include "nsIObserverService.h"
 #include "nsServiceManagerUtils.h"
 #include "nsThreadUtils.h"
@@ -79,9 +83,11 @@ SystemWorkerManager::Init()
   NS_ASSERTION(NS_IsMainThread(), "We can only initialize on the main thread");
   NS_ASSERTION(!mShutdown, "Already shutdown!");
 
+  nsresult rv;
+#ifdef MOZ_WIDGET_GONK
   mozilla::AutoSafeJSContext cx;
 
-  nsresult rv = InitWifi(cx);
+  rv = InitWifi(cx);
   if (NS_FAILED(rv)) {
     NS_WARNING("Failed to initialize WiFi Networking!");
     return rv;
@@ -93,6 +99,7 @@ SystemWorkerManager::Init()
   InitializeTimeZoneSettingObserver();
   nsCOMPtr<nsIAudioManager> audioManager =
     do_GetService(NS_AUDIOMANAGER_CONTRACTID);
+#endif
 
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
   if (!obs) {
@@ -116,23 +123,29 @@ SystemWorkerManager::Shutdown()
 
   mShutdown = true;
 
+#ifdef MOZ_WIDGET_GONK
   ShutdownAutoMounter();
+#endif
 
 #ifdef MOZ_B2G_RIL
   RilConsumer::Shutdown();
 #endif
 
+#ifdef MOZ_WIDGET_GONK
   nsCOMPtr<nsIWifi> wifi(do_QueryInterface(mWifiWorker));
   if (wifi) {
     wifi->Shutdown();
     wifi = nullptr;
   }
+#endif
   mWifiWorker = nullptr;
 
+#ifdef MOZ_WIDGET_GONK
   if (mKeyStore) {
     mKeyStore->Shutdown();
     mKeyStore = nullptr;
   }
+#endif
 
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
   if (obs) {
@@ -173,10 +186,12 @@ SystemWorkerManager::GetInterface(const nsIID &aIID, void **aResult)
 {
   NS_ASSERTION(NS_IsMainThread(), "Wrong thread!");
 
+#ifdef MOZ_WIDGET_GONK
   if (aIID.Equals(NS_GET_IID(nsIWifi))) {
     return CallQueryInterface(mWifiWorker,
                               reinterpret_cast<nsIWifi**>(aResult));
   }
+#endif
 
   NS_WARNING("Got nothing for the requested IID!");
   return NS_ERROR_NO_INTERFACE;
@@ -205,6 +220,7 @@ SystemWorkerManager::RegisterRilWorker(unsigned int aClientId,
 #endif // MOZ_B2G_RIL
 }
 
+#ifdef MOZ_WIDGET_GONK
 nsresult
 SystemWorkerManager::InitWifi(JSContext *cx)
 {
@@ -221,6 +237,7 @@ SystemWorkerManager::InitKeyStore(JSContext *cx)
   mKeyStore = new KeyStore();
   return NS_OK;
 }
+#endif
 
 NS_IMPL_ISUPPORTS(SystemWorkerManager,
                   nsIObserver,

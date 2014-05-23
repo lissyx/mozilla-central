@@ -2547,10 +2547,12 @@ RadioInterface.prototype = {
         } else {
           // Set a sane minimum time.
           let buildTime = libcutils.property_get("ro.build.date.utc", "0") * 1000;
-          let file = FileUtils.File("/system/b2g/b2g");
-          if (file.lastModifiedTime > buildTime) {
-            buildTime = file.lastModifiedTime;
-          }
+	  try {
+            let file = FileUtils.File("/system/b2g/b2g");
+            if (file.lastModifiedTime > buildTime) {
+              buildTime = file.lastModifiedTime;
+            }
+	  } catch (ex) { }
           if (buildTime > Date.now()) {
             gTimeService.set(buildTime);
           }

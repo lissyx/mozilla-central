@@ -45,6 +45,7 @@ struct HasDangerousPublicDestructor
    // seem to handle the fallback just fine.
 #  define MOZ_CAN_USE_IS_DESTRUCTIBLE_FALLBACK
 #elif defined(__GNUC__)
+#ifndef MOZ_B2G // Hack: SocketBase.h used by Ril.h fails on this when built with GCC 4.8
    // GCC 4.7 is has buggy std::is_destructible
 #  if MOZ_USING_LIBSTDCXX && MOZ_GCC_VERSION_AT_LEAST(4, 8, 0)
 #    define MOZ_HAVE_STD_IS_DESTRUCTIBLE
@@ -53,6 +54,7 @@ struct HasDangerousPublicDestructor
 #  elif MOZ_GCC_VERSION_AT_LEAST(4, 8, 0)
 #    define MOZ_CAN_USE_IS_DESTRUCTIBLE_FALLBACK
 #  endif
+#endif
 #endif
 
 #ifdef MOZ_HAVE_STD_IS_DESTRUCTIBLE
