@@ -386,7 +386,13 @@ pref("content.ime.strict_policy", true);
 // $ adb shell stop
 // $ adb shell setprop log.redirect-stdio true
 // $ adb shell start
-pref("browser.dom.window.dump.enabled", false);
+pref("browser.dom.window.dump.enabled", true);
+pref("ril.debugging.enabled", true);
+
+// Fake Rild/libril in JS
+pref("ril.libriljs.enabled", true);
+pref("ril.libriljs.slots.0", true);
+pref("ril.libriljs.slots.1", true);
 
 // Default Content Security Policy to apply to privileged and certified apps
 pref("security.apps.privileged.CSP.default", "default-src *; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'");
