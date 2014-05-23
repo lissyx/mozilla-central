@@ -98,9 +98,6 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
         '/dom/system/android',
     ]
 elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
-    LOCAL_INCLUDES += [
-        '/dom/system/gonk',
-    ]
     CXXFLAGS += [
         '-I%s/%s' % (CONFIG['ANDROID_SOURCE'], d) for d in [
             'dalvik/libnativehelper/include/nativehelper',
@@ -116,6 +113,11 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
 if CONFIG['MOZ_B2G_FM']:
     LOCAL_INCLUDES += [
         '/dom/fmradio',
+    ]
+
+if CONFIG['MOZ_B2G_RIL']:
+    LOCAL_INCLUDES += [
+        '/dom/system/gonk',
     ]
 
 if CONFIG['MOZ_B2G_BT']:

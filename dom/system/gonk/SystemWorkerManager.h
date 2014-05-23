@@ -29,9 +29,11 @@ class nsIWorkerHolder;
 
 namespace mozilla {
 
+#ifdef MOZ_WIDGET_GONK
 namespace ipc {
   class KeyStore;
 }
+#endif
 
 namespace dom {
 namespace gonk {
@@ -59,12 +61,17 @@ private:
   SystemWorkerManager();
   ~SystemWorkerManager();
 
+#ifdef MOZ_WIDGET_GONK
+  nsresult InitNetd(JSContext *cx);
   nsresult InitWifi(JSContext *cx);
   nsresult InitKeyStore(JSContext *cx);
+#endif
 
   nsCOMPtr<nsIWorkerHolder> mWifiWorker;
 
+#ifdef MOZ_WIDGET_GONK
   nsRefPtr<ipc::KeyStore> mKeyStore;
+#endif
 
   bool mShutdown;
 };

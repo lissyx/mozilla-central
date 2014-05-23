@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/telephony/TelephonyFactory.h"
-#if defined(MOZ_WIDGET_GONK) && defined(MOZ_B2G_RIL)
+#if defined(MOZ_B2G_RIL)
 #include "nsIGonkTelephonyService.h"
 #endif
 #include "nsServiceManagerUtils.h"
@@ -20,7 +20,7 @@ TelephonyFactory::CreateTelephonyService()
 
   if (XRE_GetProcessType() == GeckoProcessType_Content) {
     service = new TelephonyIPCService();
-#if defined(MOZ_WIDGET_GONK) && defined(MOZ_B2G_RIL)
+#if defined(MOZ_B2G_RIL)
   } else {
     service = do_CreateInstance(GONK_TELEPHONY_SERVICE_CONTRACTID);
 #endif
