@@ -860,6 +860,10 @@ XPCOMUtils.defineLazyGetter(this, "gDataConnectionManager", function () {
 // property.
 try {
   Services.prefs.setIntPref(kPrefRilNumRadioInterfaces, (function() {
+    try {
+      return Services.prefs.getBranch("ril.libriljs.slots.").getChildList("").length;
+    } catch(e) {}
+
     // When Gonk property "ro.moz.ril.numclients" is not set, return 1; if
     // explicitly set to any number larger-equal than 0, return num; else, return
     // 1 for compatibility.

@@ -482,6 +482,11 @@
 @RESPATH@/components/ResourceStatsManager.manifest
 #endif // MOZ_WIDGET_GONK
 
+; Fake RIL
+#if defined(MOZ_B2G_RIL)
+@BINPATH@/components/FakeLibRil.js
+#endif // MOZ_B2G_RIL
+
 ; RIL
 #if defined(MOZ_B2G_RIL)
 @RESPATH@/components/CellBroadcastService.js
