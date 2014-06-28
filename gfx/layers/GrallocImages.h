@@ -73,6 +73,7 @@ public:
   // From [android 4.0.4]/hardware/msm7k/libgralloc-qsd8k/gralloc_priv.h
   enum {
     /* OEM specific HAL formats */
+    HAL_PIXEL_FORMAT_YCbCr_420_SP_POWERVR   = 0x100,
     HAL_PIXEL_FORMAT_YCbCr_422_P            = 0x102,
     HAL_PIXEL_FORMAT_YCbCr_420_P            = 0x103,
     HAL_PIXEL_FORMAT_YCbCr_420_SP           = 0x109,
