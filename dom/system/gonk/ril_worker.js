@@ -3168,9 +3168,7 @@ RilObject.prototype = {
 
     let ICCRecordHelper = this.context.ICCRecordHelper;
     // Try to get iccId only when cardState left GECKO_CARDSTATE_UNDETECTED.
-    if (iccStatus.cardState === CARD_STATE_PRESENT &&
-        (this.cardState === GECKO_CARDSTATE_UNINITIALIZED ||
-         this.cardState === GECKO_CARDSTATE_UNDETECTED)) {
+    if (iccStatus.cardState === CARD_STATE_PRESENT) {
       ICCRecordHelper.readICCID();
     }
 
