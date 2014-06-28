@@ -127,6 +127,7 @@ static nsTArray<CommandChain*> gCommandChainQueue;
 const CommandFunc NetworkUtils::sWifiEnableChain[] = {
   NetworkUtils::clearWifiTetherParms,
   NetworkUtils::wifiFirmwareReload,
+  NetworkUtils::stopAccessPointDriver,
   NetworkUtils::startAccessPointDriver,
   NetworkUtils::setAccessPoint,
   NetworkUtils::startSoftAP,
