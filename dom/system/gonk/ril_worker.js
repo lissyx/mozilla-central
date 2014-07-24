@@ -6306,7 +6306,12 @@ RilObject.prototype[REQUEST_EXIT_EMERGENCY_CALLBACK_MODE] = function REQUEST_EXI
   this.sendChromeMessage(options);
 };
 RilObject.prototype[REQUEST_GET_SMSC_ADDRESS] = function REQUEST_GET_SMSC_ADDRESS(length, options) {
-  this.SMSC = options.rilRequestError ? null : this.context.Buf.readString();
+  length = (this.context.Buf.readInt32() / 2) - 1;
+  this.context.Buf.readInt32();
+  this.SMSC = options.rilRequestError ? null : this.context.ICCPDUHelper.readDiallingNumber(length);
+  if (DEBUG) {
+    this.context.debug("SMSC: " + this.SMSC);
+  }
 
   if (!options.rilMessageType || options.rilMessageType !== "getSmscAddress") {
     return;
