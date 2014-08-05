@@ -748,20 +748,9 @@ sp<MediaSource> GonkRecorder::createAudioSource() {
         case AUDIO_ENCODER_AMR_WB:
             mime = MEDIA_MIMETYPE_AUDIO_AMR_WB;
             break;
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
         case AUDIO_ENCODER_AAC:
             mime = MEDIA_MIMETYPE_AUDIO_AAC;
-            encMeta->setInt32(kKeyAACProfile, OMX_AUDIO_AACObjectLC);
             break;
-        case AUDIO_ENCODER_HE_AAC:
-            mime = MEDIA_MIMETYPE_AUDIO_AAC;
-            encMeta->setInt32(kKeyAACProfile, OMX_AUDIO_AACObjectHE);
-            break;
-        case AUDIO_ENCODER_AAC_ELD:
-            mime = MEDIA_MIMETYPE_AUDIO_AAC;
-            encMeta->setInt32(kKeyAACProfile, OMX_AUDIO_AACObjectELD);
-            break;
-#endif
         default:
             RE_LOGE("Unknown audio encoder: %d", mAudioEncoder);
             return NULL;
@@ -793,15 +782,12 @@ sp<MediaSource> GonkRecorder::createAudioSource() {
     return audioEncoder;
 }
 
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
 status_t GonkRecorder::startAACRecording() {
     // FIXME:
     // Add support for OUTPUT_FORMAT_AAC_ADIF
     CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_AAC_ADTS);
 
-    CHECK(mAudioEncoder == AUDIO_ENCODER_AAC ||
-          mAudioEncoder == AUDIO_ENCODER_HE_AAC ||
-          mAudioEncoder == AUDIO_ENCODER_AAC_ELD);
+    CHECK(mAudioEncoder == AUDIO_ENCODER_AAC);
     CHECK(mAudioSource != AUDIO_SOURCE_CNT);
 
     mWriter = new AACWriter(mOutputFd);
@@ -813,7 +799,6 @@ status_t GonkRecorder::startAACRecording() {
 
     return status;
 }
-#endif
 
 status_t GonkRecorder::startAMRRecording() {
     CHECK(mOutputFormat == OUTPUT_FORMAT_AMR_NB ||
@@ -884,13 +869,9 @@ status_t GonkRecorder::startMPEG2TSRecording() {
     sp<MediaWriter> writer = new MPEG2TSWriter(mOutputFd);
 
     if (mAudioSource != AUDIO_SOURCE_CNT) {
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-        if (mAudioEncoder != AUDIO_ENCODER_AAC &&
-            mAudioEncoder != AUDIO_ENCODER_HE_AAC &&
-            mAudioEncoder != AUDIO_ENCODER_AAC_ELD) {
+        if (mAudioEncoder != AUDIO_ENCODER_AAC) {
             return ERROR_UNSUPPORTED;
         }
-#endif
         status_t err = setupAudioEncoder(writer);
 
         if (err != OK) {
@@ -1309,11 +1290,7 @@ status_t GonkRecorder::setupAudioEncoder(const sp<MediaWriter>& writer) {
     switch(mAudioEncoder) {
         case AUDIO_ENCODER_AMR_NB:
         case AUDIO_ENCODER_AMR_WB:
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
         case AUDIO_ENCODER_AAC:
-        case AUDIO_ENCODER_HE_AAC:
-        case AUDIO_ENCODER_AAC_ELD:
-#endif
             break;
 
         default:
