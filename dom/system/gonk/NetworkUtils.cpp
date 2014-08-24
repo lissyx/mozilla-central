@@ -725,7 +725,7 @@ void NetworkUtils::setInterfaceUp(CommandChain* aChain,
                      GET_CHAR(mLink));
   } else {
     snprintf(command, MAX_COMMAND_SIZE - 1, "interface setcfg %s %s %s [%s]",
-                     GET_CHAR(mIfname),
+                     GET_CHAR(mInternalIfname),
                      GET_CHAR(mIp),
                      GET_CHAR(mPrefix),
                      GET_CHAR(mLink));

@@ -588,7 +588,7 @@ TetheringService.prototype = {
   enableWifiTethering: function(aEnable, aConfig, aCallback) {
     // Fill in config's required fields.
     aConfig.ifname         = this._tetheringInterface[TETHERING_TYPE_WIFI].internalInterface;
-    aConfig.internalIfname = this._tetheringInterface[TETHERING_TYPE_WIFI].internalInterface;
+    aConfig.internalIfname = WIFI_CTRL_INTERFACE;
     aConfig.externalIfname = this._tetheringInterface[TETHERING_TYPE_WIFI].externalInterface;
 
     this._wifiTetheringRequestOngoing = true;
