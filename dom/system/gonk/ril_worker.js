@@ -3542,6 +3542,17 @@ RilObject.prototype = {
     let stateChanged = this._processCREG(rs, state);
     if (stateChanged && rs.connected) {
       this.getSmscAddress();
+
+      // Bug 1061272: On Nexus S at least, we have voice registration state
+      // without any network type/radio tech. So if we have voice connected
+      // And that its type is null, and that data type is not null, then
+      // we make use of the data registration state radio tech and type to
+      // populate the voice registration state.
+      let drs = this.dataRegistrationState;
+      if (rs.type === null && rs.type !== drs.type) {
+        rs.radioTech = drs.radioTech;
+        rs.type = drs.type;
+      }
     }
 
     let cell = rs.cell;
