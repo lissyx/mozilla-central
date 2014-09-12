@@ -333,6 +333,9 @@ public:
                               ErrorResult& aRv);
 #endif
 
+  void SetLight(int16_t aType, uint32_t aColor,
+                int16_t aFlashMode, int16_t aFlashOnMS, int16_t aFlashOffMS);
+
 private:
   virtual ~Navigator();
 

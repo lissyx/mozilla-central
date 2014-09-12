@@ -469,6 +469,13 @@ bool IsHeadphoneEventFromInputDev()
   return false;
 }
 
+void
+SetLight(int16_t aType, uint32_t aColor,
+         int16_t aFlashMode, int16_t aFlashOnMS, int16_t aFlashOffMS)
+{
+  Hal()->SendSetLight(aType, aColor, aFlashMode, aFlashOnMS, aFlashOffMS);
+}
+
 class HalParent : public PHalParent
                 , public BatteryObserver
                 , public NetworkObserver
@@ -880,6 +887,15 @@ public:
     }
 
     hal::FactoryReset(reason);
+    return true;
+  }
+
+  virtual bool
+  RecvSetLight(const int16_t& aType, const uint32_t& aColor,
+               const int16_t& aFlashMode, const int16_t& aFlashOnMS,
+               const int16_t& aFlashOffMS) MOZ_OVERRIDE
+  {
+    hal::SetLight(aType, aColor, aFlashMode, aFlashOnMS, aFlashOffMS);
     return true;
   }
 

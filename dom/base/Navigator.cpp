@@ -2449,6 +2449,13 @@ Navigator::GetWindowFromGlobal(JSObject* aGlobal)
   return win.forget();
 }
 
+void
+Navigator::SetLight(int16_t aType, uint32_t aColor,
+                    int16_t aFlashMode, int16_t aFlashOnMS, int16_t aFlashOffMS)
+{
+  hal::SetLight(aType, aColor, aFlashMode, aFlashOnMS, aFlashOffMS);
+}
+
 nsresult
 Navigator::GetPlatform(nsAString& aPlatform, bool aUsePrefOverriddenValue)
 {

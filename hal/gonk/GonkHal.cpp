@@ -105,6 +105,9 @@
 #ifndef BATTERY_FULL_ARGB
 #define BATTERY_FULL_ARGB 0x0000FF00
 #endif
+#ifndef BATTERY_LOW_CRITICAL_ARGB
+#define BATTERY_LOW_CRITICAL_ARGB 0x00FF0000
+#endif
 
 using namespace mozilla;
 using namespace mozilla::hal;
@@ -424,6 +427,7 @@ public:
   {
     hal::BatteryInformation info;
     hal_impl::GetCurrentBatteryInformation(&info);
+    bool flash = false;
 
     // Control the battery indicator (led light) here using BatteryInformation
     // we just retrieved.
@@ -434,12 +438,15 @@ public:
     } else if (info.charging() && (info.level() < 1)) {
       // Charging but not full.
       color = BATTERY_CHARGING_ARGB;
+    } else if (!info.charging() && (info.level() <= 0.10)) {
+      flash = true;
+      color = BATTERY_LOW_CRITICAL_ARGB;
     } // else turn off battery indicator.
 
     LightConfiguration aConfig;
     aConfig.light = eHalLightID_Battery;
     aConfig.mode = eHalLightMode_User;
-    aConfig.flash = eHalLightFlash_None;
+    aConfig.flash = flash ? eHalLightFlash_Hardware : eHalLightFlash_None;
     aConfig.flashOnMS = aConfig.flashOffMS = 0;
     aConfig.color = color;
 
@@ -1872,6 +1879,20 @@ FactoryReset(FactoryResetReason& aReason)
   } else {
     recoveryService->FactoryReset("normal");
   }
+}
+
+void
+SetLight(int16_t aType, uint32_t aColor,
+         int16_t aFlashMode, int16_t aFlashOnMS, int16_t aFlashOffMS)
+{
+  printf_stderr("XXX GonkHal::SetLight %d %d\n", aType, aColor);
+  LightConfiguration config;
+  config.mode = eHalLightMode_User;
+  config.flash = FlashMode(aFlashMode);
+  config.flashOnMS = aFlashOnMS;
+  config.flashOffMS = aFlashOffMS;
+  config.color = aColor;
+  SetLight(static_cast<LightType>(aType), config);
 }
 
 } // hal_impl

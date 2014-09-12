@@ -649,6 +649,12 @@ uint32_t GetTotalSystemMemoryLevel();
  */
 bool IsHeadphoneEventFromInputDev();
 
+/**
+ * Control the led appearance.
+ */
+void SetLight(int16_t aType, uint32_t aColor,
+              int16_t aFlashMode, int16_t aFlashOnMS, int16_t aFlashOffMS);
+
 } // namespace MOZ_HAL_NAMESPACE
 } // namespace mozilla
 

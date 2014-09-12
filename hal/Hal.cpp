@@ -1280,5 +1280,12 @@ bool IsHeadphoneEventFromInputDev()
   RETURN_PROXY_IF_SANDBOXED(IsHeadphoneEventFromInputDev(), false);
 }
 
+void SetLight(int16_t aType, uint32_t aColor,
+              int16_t aFlashMode, int16_t aFlashOnMS, int16_t aFlashOffMS)
+{
+  AssertMainThread();
+  PROXY_IF_SANDBOXED(SetLight(aType, aColor, aFlashMode, aFlashOnMS, aFlashOffMS));
+}
+
 } // namespace hal
 } // namespace mozilla
