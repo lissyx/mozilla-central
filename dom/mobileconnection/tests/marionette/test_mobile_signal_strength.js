@@ -55,6 +55,78 @@ const TEST_DATA = [
       signalStrength: -111,
       relSignalStrength: 0
     }
+  },
+  // Valid rxlev with max value, rsrp with max value.
+  {
+    input: {
+      rxlev: 63,
+      rsrp: 44,
+      rssnr: -65535
+    },
+    expect: {
+      signalStrength: -48,
+      relSignalStrength: 100
+    }
+  },
+  // Valid rxlev, rsrp.
+  {
+    input: {
+      rxlev: 12,
+      rsrp: 105,
+      rssnr: -65535
+    },
+    expect: {
+      signalStrength: -99,
+      relSignalStrength: 50
+    }
+  },
+  // Valid rxlev with min value, rsrp with min value.
+  {
+    input: {
+      rxlev: 0,
+      rsrp: 140,
+      rssnr: -65535
+    },
+    expect: {
+      signalStrength: -111,
+      relSignalStrength: 0
+    }
+  },
+  // Valid rxlev with max value, rssnr with max value.
+  {
+    input: {
+      rxlev: 63,
+      rsrp: -65535,
+      rssnr: 300
+    },
+    expect: {
+      signalStrength: -48,
+      relSignalStrength: 100
+    }
+  },
+  // Valid rxlev, rssnr.
+  {
+    input: {
+      rxlev: 12,
+      rsrp: -65535,
+      rssnr: 8
+    },
+    expect: {
+      signalStrength: -99,
+      relSignalStrength: 50
+    }
+  },
+  // Valid rxlev with min value, rssnr with min value.
+  {
+    input: {
+      rxlev: 0,
+      rsrp: -65535,
+      rssnr: -200
+    },
+    expect: {
+      signalStrength: -111,
+      relSignalStrength: 0
+    }
   }
 ];
 

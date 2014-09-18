@@ -3538,10 +3538,10 @@ RilObject.prototype = {
    *         Or null if invalid signal input.
    */
   _processLteSignal: function(signal) {
-    // Valid values are 0-63 as defined in TS 27.007 clause 8.69.
+    // Valid values are 0-31 as defined in TS 27.007 clause 8.5.
     if (signal.lteSignalStrength === undefined ||
         signal.lteSignalStrength < 0 ||
-        signal.lteSignalStrength > 63) {
+        signal.lteSignalStrength > 31) {
       return null;
     }
 
@@ -3557,12 +3557,14 @@ RilObject.prototype = {
     };
 
     // TODO: Bug 982013: reconsider signalStrength/relSignalStrength APIs for
-    //       GSM/CDMA/LTE, and take rsrp/rssnr into account for LTE case then.
-    let signalStrength = -111 + signal.lteSignalStrength;
+    //       GSM/CDMA.
+    let signalStrength = -113 + 2 * signal.lteSignalStrength;
     info.voice.signalStrength = info.data.signalStrength = signalStrength;
-    // 0 and 12 are referred to AOSP's implementation. These values are not
-    // constants and can be customized based on different requirements.
-    let signalLevel = this._processSignalLevel(signal.lteSignalStrength, 0, 12);
+    // Use RSRP and RSSNR as in AOSP
+    let signalLevel = Math.max(
+      this._processSignalLevel(signal.lteRSRP * -1, -115, -95),
+      this._processSignalLevel(signal.lteRSSNR, -30, 45)
+    );
     info.voice.relSignalStrength = info.data.relSignalStrength = signalLevel;
 
     return info;
