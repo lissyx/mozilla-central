@@ -4364,7 +4364,11 @@ RilObject.prototype = {
       case NETWORK_CREG_TECH_LTE:
       case NETWORK_CREG_TECH_HSPAP:
       case NETWORK_CREG_TECH_GSM:
+      case NETWORK_CREG_TECH_DCHSPAP:
         return true;
+      default:
+        this.context.debug("Unsupported radioTech: " + radioTech);
+        break;
     }
 
     return false;
@@ -6332,7 +6336,11 @@ RilObject.prototype[REQUEST_GET_NEIGHBORING_CELL_IDS] = function REQUEST_GET_NEI
       case NETWORK_CREG_TECH_HSUPA:
       case NETWORK_CREG_TECH_HSPA:
       case NETWORK_CREG_TECH_HSPAP:
+      case NETWORK_CREG_TECH_DCHSPAP:
         cellId.wcdmaPsc = this.parseInt(cid, -1, 16);
+        break;
+      default:
+        this.context.debug("Unsupported radioTech: " + radioTech);
         break;
     }
 
