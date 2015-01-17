@@ -342,8 +342,11 @@ GonkGPSGeolocationProvider::GetGPSInterface()
   const GpsInterface* result = gps_device->get_gps_interface(gps_device);
 
   if (result->size != sizeof(GpsInterface)) {
-    return nullptr;
+    nsContentUtils::LogMessageToConsole("geo: GetGPSInterface: sizeof(GpsInterface)=%u, but result->size=%u", sizeof(GpsInterface), result->size);
+    // HTC Vision hack: Keon interface is a bit different.
+    // return nullptr;
   }
+
   return result;
 }
 
