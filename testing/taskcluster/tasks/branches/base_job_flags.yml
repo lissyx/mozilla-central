@@ -31,7 +31,6 @@ flags:
     crashtest-e10s: /crashtest-e10s.*/
     e10s: /.*e10s.*/
     gaia-js-integration: /.*gaia-js-integration.*/
-    gaia-ui-test: /.*gaia-ui-test.*/
     gtest: /gtest.*/
     jittest: /jittest.*/
     jittests: /jittest.*/
@@ -39,6 +38,7 @@ flags:
     jsreftest-e10s: /jsreftest-e10s.*/
     luciddream: /luciddream.*/
     marionette: /marionette.*/
+    marionette-e10s: /marionette-e10s.*/
     mochitest: /mochitest.*/
     mochitests: /mochitest.*/
     mochitest-e10s: /mochitest-e10s.*/
@@ -54,6 +54,7 @@ flags:
     mochitest-dt-e10s: /mochitest-devtools-chrome-e10s.*/
     mochitest-gl: /mochitest-webgl.*/
     mochitest-push: /mochitest-push.*/
+    mochitest-vg: /mochitest-valgrind.*/
     reftest: /(plain-)?reftest.*/
     reftest-no-accel: /(plain-)?reftest-no-accel.*/
     reftests: /(plain-)?reftest.*/
@@ -99,6 +100,7 @@ flags:
     - aries-dogfood
     - aries-noril
     - android-api-15
+    - android-api-15-frontend
     - android-partner-sample1
     - android-b2gdroid
     - linux
@@ -106,7 +108,6 @@ flags:
     - linux64-st-an
     - macosx64
     - macosx64-st-an
-    - eslint-gecko
 
   tests:
     - cppunit
@@ -119,10 +120,6 @@ flags:
     - gaia-linter
     - gaia-unit
     - gaia-unit-oop
-    - gaia-ui-test-sanity
-    - gaia-ui-test-functional
-    - gaia-ui-test-functional-dsds
-    - gaia-ui-test-unit
     - gtest
     - jetpack
     - jittests
@@ -130,6 +127,7 @@ flags:
     - jsreftest-e10s
     - luciddream
     - marionette
+    - marionette-e10s
     - marionette-webapi
     - mochitest
     - mochitest-a11y
@@ -144,6 +142,7 @@ flags:
     - mochitest-oop
     - mochitest-push
     - mochitest-webgl
+    - mochitest-valgrind
     - mozmill
     - reftest
     - reftest-e10s
@@ -155,4 +154,3 @@ flags:
     - web-platform-tests-reftests
     - web-platform-tests-reftests-e10s
     - xpcshell
-

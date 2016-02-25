@@ -71,6 +71,10 @@ XPCOMUtils.defineLazyGetter(loaderModules, "CSS", () => {
   return Cu.Sandbox(this, {wantGlobalProperties: ["CSS"]}).CSS;
 });
 
+XPCOMUtils.defineLazyGetter(loaderModules, "URL", () => {
+  return Cu.Sandbox(this, {wantGlobalProperties: ["URL"]}).URL;
+});
+
 var sharedGlobalBlocklist = ["sdk/indexed-db"];
 
 /**
@@ -394,6 +398,22 @@ DevToolsLoader.prototype = {
         id: this.id,
         main: this.main
       },
+      // Make sure `define` function exists.  This allows defining some modules
+      // in AMD format while retaining CommonJS compatibility through this hook.
+      // JSON Viewer needs modules in AMD format, as it currently uses RequireJS
+      // from a content document and can't access our usual loaders.  So, any
+      // modules shared with the JSON Viewer should include a define wrapper:
+      //
+      //   // Make this available to both AMD and CJS environments
+      //   define(function(require, exports, module) {
+      //     ... code ...
+      //   });
+      //
+      // Bug 1248830 will work out a better plan here for our content module
+      // loading needs, especially as we head towards devtools.html.
+      define(factory) {
+        factory(this.require, this.exports, this.module);
+      },
     };
     // Lazy define console in order to load Console.jsm only when it is used
     XPCOMUtils.defineLazyGetter(this._provider.globals, "console", () => {
@@ -422,7 +442,7 @@ DevToolsLoader.prototype = {
   /**
    * Reload the current provider.
    */
-  reload: function(showToolbox) {
+  reload: function() {
     var events = this.require("sdk/system/events");
     events.emit("startupcache-invalidate", {});
     events.emit("devtools-unloaded", {});
@@ -432,24 +452,6 @@ DevToolsLoader.prototype = {
     delete this._mainid;
     this._chooseProvider();
     this.main("devtools/client/main");
-
-    let window = Services.wm.getMostRecentWindow(null);
-    let location = window.location.href;
-    if (location.includes("/browser.xul") && showToolbox) {
-      // Reopen the toolbox automatically if we are reloading from toolbox shortcut
-      // and are on a browser window.
-      // Wait for a second before opening the toolbox to avoid races
-      // between the old and the new one.
-      let {setTimeout} = Cu.import("resource://gre/modules/Timer.jsm", {});
-      setTimeout(() => {
-        let { gBrowser } = window;
-        let target = this.TargetFactory.forTab(gBrowser.selectedTab);
-        const { gDevTools } = require("devtools/client/framework/devtools");
-        gDevTools.showToolbox(target);
-      }, 1000);
-    } else if (location.includes("/webide.xul")) {
-      window.location.reload();
-    }
   },
 
   /**

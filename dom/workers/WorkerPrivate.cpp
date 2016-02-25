@@ -62,7 +62,6 @@
 #include "mozilla/dom/WorkerBinding.h"
 #include "mozilla/dom/WorkerDebuggerGlobalScopeBinding.h"
 #include "mozilla/dom/WorkerGlobalScopeBinding.h"
-#include "mozilla/dom/indexedDB/IDBFactory.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/TimelineConsumers.h"
 #include "mozilla/WorkerTimelineMarker.h"
@@ -503,12 +502,32 @@ private:
   virtual bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
+    aWorkerPrivate->AssertIsOnWorkerThread();
+
     ErrorResult rv;
     scriptloader::LoadMainScript(aCx, mScriptURL, WorkerScript, rv);
-    if (NS_WARN_IF(rv.Failed())) {
-      // I guess suppress the exception since that's what we used to
-      // do, though this seems moderately weird.
+    rv.WouldReportJSException();
+    // Explicitly ignore NS_BINDING_ABORTED on rv.  Or more precisely, still
+    // return false and don't SetWorkerScriptExecutedSuccessfully() in that
+    // case, but don't throw anything on aCx.  The idea is to not dispatch error
+    // events if our load is canceled with that error code.
+    if (rv.ErrorCodeIs(NS_BINDING_ABORTED)) {
       rv.SuppressException();
+      return false;
+    }
+    // Make sure to propagate exceptions from rv onto aCx, so that our PostRun
+    // can report it.  We do this for all failures on rv, because now we're
+    // using rv to track all the state we care about.
+    //
+    // This is a little dumb, but aCx is in the null compartment here because we
+    // set it up that way in our Run(), since we had not created the global at
+    // that point yet.  So we need to enter the compartment of our global,
+    // because setting a pending exception on aCx involves wrapping into its
+    // current compartment.  Luckily we have a global now (else how would we
+    // have a JS exception?) so we can just enter its compartment.
+    JSAutoCompartment ac(aCx,
+                         aWorkerPrivate->GlobalScope()->GetGlobalJSObject());
+    if (rv.MaybeSetPendingException(aCx)) {
       return false;
     }
 
@@ -532,6 +551,8 @@ private:
   virtual bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
+    aWorkerPrivate->AssertIsOnWorkerThread();
+
     WorkerDebuggerGlobalScope* globalScope =
       aWorkerPrivate->CreateDebuggerGlobalScope(aCx);
     if (!globalScope) {
@@ -544,10 +565,19 @@ private:
     ErrorResult rv;
     JSAutoCompartment ac(aCx, global);
     scriptloader::LoadMainScript(aCx, mScriptURL, DebuggerScript, rv);
-    if (NS_WARN_IF(rv.Failed())) {
-      // I guess suppress the exception since that's what we used to
-      // do, though this seems moderately weird.
+    rv.WouldReportJSException();
+    // Explicitly ignore NS_BINDING_ABORTED on rv.  Or more precisely, still
+    // return false and don't SetWorkerScriptExecutedSuccessfully() in that
+    // case, but don't throw anything on aCx.  The idea is to not dispatch error
+    // events if our load is canceled with that error code.
+    if (rv.ErrorCodeIs(NS_BINDING_ABORTED)) {
       rv.SuppressException();
+      return false;
+    }
+    // Make sure to propagate exceptions from rv onto aCx, so that our PostRun
+    // can report it.  We do this for alll failures on rv, because now we're
+    // using rv to track all the state we care about.
+    if (rv.MaybeSetPendingException(aCx)) {
       return false;
     }
 
@@ -611,9 +641,7 @@ private:
     WorkerRunnable::PostRun(aCx, aWorkerPrivate, aRunResult);
 
     // Match the busy count increase from NotifyRunnable.
-    if (!aWorkerPrivate->ModifyBusyCountFromWorker(aCx, false)) {
-      JS_ReportPendingException(aCx);
-    }
+    aWorkerPrivate->ModifyBusyCountFromWorker(aCx, false);
 
     aWorkerPrivate->CloseHandlerFinished();
   }
@@ -4045,10 +4073,9 @@ WorkerPrivate::Constructor(JSContext* aCx,
     nsresult rv = GetLoadInfo(aCx, nullptr, parent, aScriptURL,
                               aIsChromeWorker, InheritLoadGroup,
                               aWorkerType, stackLoadInfo.ptr());
+    aRv.MightThrowJSException();
     if (NS_FAILED(rv)) {
-      // XXXkhuey this is weird, why throw again after setting an exception?
-      scriptloader::ReportLoadError(aCx, rv);
-      aRv.Throw(rv);
+      scriptloader::ReportLoadError(aCx, aRv, rv);
       return nullptr;
     }
 
@@ -4107,7 +4134,6 @@ WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
                            WorkerLoadInfo* aLoadInfo)
 {
   using namespace mozilla::dom::workers::scriptloader;
-  using mozilla::dom::indexedDB::IDBFactory;
 
   MOZ_ASSERT(aCx);
   MOZ_ASSERT_IF(NS_IsMainThread(), aCx == nsContentUtils::GetCurrentJSContext());
@@ -4164,7 +4190,7 @@ WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
     AssertIsOnMainThread();
 
     // Make sure that the IndexedDatabaseManager is set up
-    NS_WARN_IF(!indexedDB::IndexedDatabaseManager::GetOrCreate());
+    NS_WARN_IF(!IndexedDatabaseManager::GetOrCreate());
 
     nsIScriptSecurityManager* ssm = nsContentUtils::GetSecurityManager();
     MOZ_ASSERT(ssm);
@@ -6444,13 +6470,17 @@ WorkerPrivate::CreateDebuggerGlobalScope(JSContext* aCx)
 
   JSAutoCompartment ac(aCx, global);
 
-  if (!JS_DefineDebuggerObject(aCx, global)) {
+  // RegisterDebuggerBindings() can spin a nested event loop so we have to set
+  // mDebuggerScope before calling it, and we have to make sure to unset
+  // mDebuggerScope if it fails.
+  mDebuggerScope = Move(globalScope);
+
+  if (!RegisterDebuggerBindings(aCx, global)) {
+    mDebuggerScope = nullptr;
     return nullptr;
   }
 
   JS_FireOnNewGlobalObject(aCx, global);
-
-  mDebuggerScope = globalScope.forget();
 
   return mDebuggerScope;
 }

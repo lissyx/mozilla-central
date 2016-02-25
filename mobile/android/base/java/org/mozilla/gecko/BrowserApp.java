@@ -161,6 +161,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.regex.Pattern;
 
 public class BrowserApp extends GeckoApp
                         implements TabsPanel.TabsLayoutChangeListener,
@@ -424,7 +425,7 @@ public class BrowserApp extends GeckoApp
     }
 
     private void showBookmarkRemovedSnackbar() {
-        SnackbarHelper.showSnackbar(this, getResources().getString(R.string.bookmark_removed), Snackbar.LENGTH_SHORT);
+        SnackbarHelper.showSnackbar(this, getResources().getString(R.string.bookmark_removed), Snackbar.LENGTH_LONG);
     }
 
     private void showSwitchToReadingListSnackbar(String message) {
@@ -456,7 +457,7 @@ public class BrowserApp extends GeckoApp
     public void onRemovedFromReadingList(String url) {
         SnackbarHelper.showSnackbar(this,
                 getResources().getString(R.string.reading_list_removed),
-                Snackbar.LENGTH_SHORT);
+                Snackbar.LENGTH_LONG);
     }
 
     @Override
@@ -587,9 +588,9 @@ public class BrowserApp extends GeckoApp
 
         final Context appContext = getApplicationContext();
 
-        if (AppConstants.MOZ_SWITCHBOARD) {
+        if (!Experiments.isDisabled(new SafeIntent(intent)) && AppConstants.MOZ_SWITCHBOARD) {
             // Initializes the default URLs the first time.
-            SwitchBoard.initDefaultServerUrls("https://switchboard-server.dev.mozaws.net/urls", "https://switchboard-server.dev.mozaws.net/v1", true);
+            SwitchBoard.initDefaultServerUrls("https://switchboard.services.mozilla.com/urls", "https://switchboard.services.mozilla.com/v1", true);
 
             final String switchboardUUID = ContextUtils.getStringExtra(intent, INTENT_KEY_SWITCHBOARD_UUID);
             SwitchBoard.setUUIDFromExtra(switchboardUUID);
@@ -1871,7 +1872,7 @@ public class BrowserApp extends GeckoApp
                         // Force tabs panel inflation once the initial
                         // pageload is finished.
                         ensureTabsPanelExists();
-                        if (mZoomedView == null) {
+                        if (AppConstants.NIGHTLY_BUILD && mZoomedView == null) {
                             ViewStub stub = (ViewStub) findViewById(R.id.zoomed_view_stub);
                             mZoomedView = (ZoomedView) stub.inflate();
                         }
@@ -2016,7 +2017,7 @@ public class BrowserApp extends GeckoApp
         if (Tabs.getInstance().getDisplayCount() == 0)
             return;
 
-        hideFirstrunPager(TelemetryContract.Method.TABSTRAY);
+        hideFirstrunPager(TelemetryContract.Method.BUTTON);
 
         if (ensureTabsPanelExists()) {
             // If we've just inflated the tabs panel, only show it once the current
@@ -2430,6 +2431,11 @@ public class BrowserApp extends GeckoApp
      */
     private void storeSearchQuery(final String query) {
         if (TextUtils.isEmpty(query)) {
+            return;
+        }
+
+        // Filter out URLs and long suggestions
+        if (query.length() > 50 || Pattern.matches("^(https?|ftp|file)://.*", query)) {
             return;
         }
 
@@ -3979,6 +3985,9 @@ public class BrowserApp extends GeckoApp
         final SharedPreferences sharedPrefs = GeckoSharedPrefs.forProfileName(this, profile.getName());
         final int seq = sharedPrefs.getInt(TelemetryConstants.PREF_SEQ_COUNT, 1);
 
+        // We store synchronously before sending the Intent to ensure this sequence number will not be re-used.
+        sharedPrefs.edit().putInt(TelemetryConstants.PREF_SEQ_COUNT, seq + 1).commit();
+
         final Intent i = new Intent(TelemetryConstants.ACTION_UPLOAD_CORE);
         i.setClass(this, TelemetryUploadService.class);
         i.putExtra(TelemetryConstants.EXTRA_DOC_ID, UUID.randomUUID().toString());
@@ -3986,9 +3995,6 @@ public class BrowserApp extends GeckoApp
         i.putExtra(TelemetryConstants.EXTRA_PROFILE_PATH, profile.getDir().toString());
         i.putExtra(TelemetryConstants.EXTRA_SEQ, seq);
         startService(i);
-
-        // Intent redelivery will ensure this value gets used - see TelemetryUploadService class comments for details.
-        sharedPrefs.edit().putInt(TelemetryConstants.PREF_SEQ_COUNT, seq + 1).apply();
     }
 
     public static interface TabStripInterface {
@@ -4000,13 +4006,16 @@ public class BrowserApp extends GeckoApp
     }
 
     @Override
-    protected StartupAction getStartupAction(final String passedURL) {
+    protected StartupAction getStartupAction(final String passedURL, final String action) {
         final boolean inGuestMode = GeckoProfile.get(this).inGuestMode();
         if (inGuestMode) {
             return StartupAction.GUEST;
         }
         if (Restrictions.isRestrictedProfile(this)) {
             return StartupAction.RESTRICTED;
+        }
+        if (ACTION_HOMESCREEN_SHORTCUT.equals(action)) {
+            return StartupAction.SHORTCUT;
         }
         return (passedURL == null ? StartupAction.NORMAL : StartupAction.URL);
     }

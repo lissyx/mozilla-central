@@ -1264,6 +1264,9 @@ public:
   bool
   RegisterBindings(JSContext* aCx, JS::Handle<JSObject*> aGlobal);
 
+  bool
+  RegisterDebuggerBindings(JSContext* aCx, JS::Handle<JSObject*> aGlobal);
+
 #define WORKER_SIMPLE_PREF(name, getter, NAME)                                \
   bool                                                                        \
   getter() const                                                              \
@@ -1445,6 +1448,9 @@ IsCurrentThreadRunningChromeWorker();
 
 JSContext*
 GetCurrentThreadJSContext();
+
+JSObject*
+GetCurrentThreadWorkerGlobal();
 
 class AutoSyncLoopHolder
 {

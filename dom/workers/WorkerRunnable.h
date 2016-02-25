@@ -115,26 +115,45 @@ protected:
   // By default asserts that Dispatch() is being called on the right thread
   // (ParentThread if |mTarget| is WorkerThread, or WorkerThread otherwise).
   // Also increments the busy count of |mWorkerPrivate| if targeting the
-  // WorkerThread.
+  // WorkerThread.  The JSContext passed in here is the one that was passed to
+  // Dispatch().
   virtual bool
   PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate);
 
   // By default asserts that Dispatch() is being called on the right thread
   // (ParentThread if |mTarget| is WorkerThread, or WorkerThread otherwise).
-  // Also reports any Dispatch() failures as an exception on |aCx|, and
-  // busy count if targeting the WorkerThread and Dispatch() failed.
+  // Also reports any Dispatch() failures as an exception on |aCx|, and busy
+  // count if targeting the WorkerThread and Dispatch() failed.  The JSContext
+  // passed in here is the one that was passed to Dispatch().
   virtual void
   PostDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
                bool aDispatchResult);
 
-  // Must be implemented by subclasses. Called on the target thread.
+  // Must be implemented by subclasses. Called on the target thread.  The return
+  // value will be passed to PostRun().  The JSContext passed in here comes from
+  // an AutoJSAPI (or AutoEntryScript) that we set up on the stack.  If
+  // mBehavior is ParentThreadUnchangedBusyCount, it is in the compartment of
+  // mWorkerPrivate's reflector (i.e. the worker object in the parent thread),
+  // unless that reflector is null, in which case it's in the compartment of the
+  // parent global (which is the compartment reflector would have been in), or
+  // in the null compartment if there is no parent global.  For other mBehavior
+  // values, we're running on the worker thread and aCx is in whatever
+  // compartment GetCurrentThreadJSContext() was in when nsIRunnable::Run() got
+  // called (XXXbz: Why is this a sane thing to be doing now that we have
+  // multiple globals per worker???).  If it wasn't in a compartment, aCx will
+  // be in either the debugger global's compartment or the worker's global's
+  // compartment depending on whether IsDebuggerRunnable() is true.
   virtual bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) = 0;
 
   // By default asserts that Run() (and WorkerRun()) were called on the correct
-  // thread. Any failures (false return from WorkerRun) are reported on |aCx|.
-  // Also sends an asynchronous message to the ParentThread if the busy
-  // count was previously modified in PreDispatch().
+  // thread.  Also sends an asynchronous message to the ParentThread if the
+  // busy count was previously modified in PreDispatch().
+  //
+  // The aCx passed here is the same one as was passed to WorkerRun and is
+  // still in the same compartment.  If aRunResult is false, any failures on
+  // aCx are reported.  Otherwise failures are left to linger on the JSContext
+  // and maim later code (XXXbz: Aiming to fix that in bug 1072144).
   virtual void
   PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate, bool aRunResult);
 
@@ -166,11 +185,20 @@ private:
   }
 
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override final
   {
     AssertIsOnMainThread();
 
     return true;
+  }
+
+  // We want to be able to assert in PostDispatch that no exceptions were thrown
+  // on aCx.  We can do that if we know no one is subclassing our
+  // DispatchInternal to do weird things.
+  virtual bool
+  DispatchInternal() override final
+  {
+    return WorkerRunnable::DispatchInternal();
   }
 
   virtual void
@@ -194,13 +222,13 @@ protected:
 
   virtual ~WorkerSyncRunnable();
 
-private:
   virtual bool
   DispatchInternal() override;
 };
 
 // This runnable is identical to WorkerSyncRunnable except it is meant to be
-// used on the main thread only.
+// created on and dispatched from the main thread only.  Its WorkerRun/PostRun
+// will run on the worker thread.
 class MainThreadWorkerSyncRunnable : public WorkerSyncRunnable
 {
 protected:
@@ -223,12 +251,32 @@ protected:
   virtual ~MainThreadWorkerSyncRunnable()
   { }
 
+  // Hook for subclasses that want to override our PreDispatch.  This override
+  // must be infallible and must not leave an exception hanging out on the
+  // JSContext.  We pass the JSContext through so callees that expect to be able
+  // to do something with script have a way to do it.  We'd pass an AutoJSAPI,
+  // but some of our subclasses are dispatched with a null JSContext*, so we
+  // can't do that sort of thing ourselves.
+  virtual void InfalliblePreDispatch(JSContext* aCx)
+  {}
+
 private:
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override final
   {
     AssertIsOnMainThread();
+    InfalliblePreDispatch(aCx);
+    MOZ_ASSERT_IF(aCx, !JS_IsExceptionPending(aCx));
     return true;
+  }
+
+  // We want to be able to assert in PostDispatch that no exceptions were thrown
+  // on aCx.  We can do that if we know no one is subclassing our
+  // DispatchInternal to do weird things.
+  virtual bool
+  DispatchInternal() override final
+  {
+    return WorkerSyncRunnable::DispatchInternal();
   }
 
   virtual void
@@ -267,8 +315,10 @@ private:
   virtual bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override;
 
+  // If this stops being final, reevaluate the assumptions
+  // MainThreadWorkerSyncRunnable::PostDispatch makes.
   virtual bool
-  DispatchInternal() override;
+  DispatchInternal() override final;
 };
 
 // This runnable is identical to StopSyncLoopRunnable except it is meant to be
@@ -291,8 +341,10 @@ protected:
   { }
 
 private:
+  // If this function stops being final, reevaluate the assumptions PostDispatch
+  // makes.
   virtual bool
-  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  PreDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override final
   {
     AssertIsOnMainThread();
     return true;
@@ -386,9 +438,8 @@ protected:
   PostDispatch(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
                bool aDispatchResult) override;
 
-  virtual void
-  PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
-          bool aRunResult) override;
+  // We just delegate PostRun to WorkerRunnable, since it does exactly
+  // what we want.
 };
 
 // Base class for the runnable objects, which makes a synchronous call to

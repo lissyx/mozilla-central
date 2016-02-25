@@ -65,7 +65,7 @@ function onLoad()
     var sel = document.getElementById("tokenMenu");
     sel.setAttribute("hidden", "true");
     var tag = document.getElementById("tokenName");
-    tag.setAttribute("value",tokenName);
+    tag.setAttribute("value", tokenName);
   }
 
   process();
@@ -199,9 +199,10 @@ function setPassword()
     success = true;
   }
 
-  if (success && params)
+  if (success && params) {
     // Return value 1 means "successfully executed ok"
     params.SetInt(1, 1);
+  }
 
   // Terminate dialog
   return success;

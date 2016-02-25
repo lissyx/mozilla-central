@@ -88,6 +88,8 @@ public:
 
   virtual ~TextureSource();
 
+  virtual const char* Name() const = 0;
+
   /**
    * Should be overridden in order to deallocate the data that is associated
    * with the rendering backend, such as GL textures.
@@ -233,6 +235,8 @@ public:
     : mUpdateSerial(0)
   {}
 
+  virtual const char* Name() const override { return "DataTextureSource"; }
+
   virtual DataTextureSource* AsDataTextureSource() override { return this; }
 
   /**
@@ -359,6 +363,11 @@ public:
    * format and produce 3 "alpha" textures sources.
    */
   virtual gfx::SurfaceFormat GetFormat() const = 0;
+  /**
+   * Return the format used for reading the texture.
+   * Apple's YCBCR_422 is R8G8B8X8.
+   */
+  virtual gfx::SurfaceFormat GetReadFormat() const { return GetFormat(); }
 
   /**
    * Called during the transaction. The TextureSource may or may not be composited.
@@ -723,6 +732,8 @@ public:
     , mHasComplexProjection(false)
   {}
   virtual ~CompositingRenderTarget() {}
+
+  virtual const char* Name() const override { return "CompositingRenderTarget"; }
 
 #ifdef MOZ_DUMP_PAINTING
   virtual already_AddRefed<gfx::DataSourceSurface> Dump(Compositor* aCompositor) { return nullptr; }

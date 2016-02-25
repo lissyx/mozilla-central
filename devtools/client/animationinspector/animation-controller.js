@@ -126,6 +126,7 @@ var getServerTraits = Task.async(function*(target) {
  */
 var AnimationsController = {
   PLAYERS_UPDATED_EVENT: "players-updated",
+  ALL_ANIMATIONS_TOGGLED_EVENT: "all-animations-toggled",
 
   initialize: Task.async(function*() {
     if (this.initialized) {
@@ -184,7 +185,7 @@ var AnimationsController = {
     this.nodeFront = null;
 
     // Finish releasing players that haven't been released yet.
-    yield Promise.all(this.nonBlockingPlayerReleases);
+    yield promise.all(this.nonBlockingPlayerReleases);
 
     if (this.animationsFront) {
       this.animationsFront.destroy();
@@ -255,7 +256,9 @@ var AnimationsController = {
       return promise.resolve();
     }
 
-    return this.animationsFront.toggleAll().catch(e => console.error(e));
+    return this.animationsFront.toggleAll()
+      .then(() => this.emit(this.ALL_ANIMATIONS_TOGGLED_EVENT, this))
+      .catch(e => console.error(e));
   },
 
   /**

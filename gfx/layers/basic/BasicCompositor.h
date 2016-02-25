@@ -23,6 +23,8 @@ public:
     , mSize(aRect.Size())
   { }
 
+  virtual const char* Name() const override { return "BasicCompositingRenderTarget"; }
+
   virtual gfx::IntSize GetSize() const override { return mSize; }
 
   void BindRenderTarget();
@@ -59,6 +61,11 @@ public:
   CreateRenderTargetFromSource(const gfx::IntRect &aRect,
                                const CompositingRenderTarget *aSource,
                                const gfx::IntPoint &aSourcePoint) override;
+
+  virtual already_AddRefed<CompositingRenderTarget>
+  CreateRenderTargetForWindow(const gfx::IntRect& aRect,
+                              SurfaceInitMode aInit,
+                              BufferMode aBufferMode);
 
   virtual already_AddRefed<DataTextureSource>
   CreateDataTextureSource(TextureFlags aFlags = TextureFlags::NO_FLAGS) override;

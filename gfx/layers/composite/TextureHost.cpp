@@ -374,6 +374,13 @@ TextureSource::~TextureSource()
     MOZ_COUNT_DTOR(TextureSource);
 }
 
+const char*
+TextureSource::Name() const
+{
+  MOZ_CRASH("TextureSource without class name");
+  return "TextureSource";
+}
+  
 BufferTextureHost::BufferTextureHost(const BufferDescriptor& aDesc,
                                      TextureFlags aFlags)
 : TextureHost(aFlags)
@@ -640,7 +647,7 @@ BufferTextureHost::GetAsSurface()
       return nullptr;
     }
   } else {
-    RefPtr<gfx::DataSourceSurface> surf =
+    result =
       gfx::Factory::CreateWrappingDataSourceSurface(GetBuffer(),
         ImageDataSerializer::GetRGBStride(mDescriptor.get_RGBDescriptor()),
         mSize, mFormat);

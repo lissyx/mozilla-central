@@ -3269,6 +3269,7 @@ public:
   }
 
   Type GetShapeType() const { return mType; }
+  nsCSSKeyword GetShapeTypeName() const;
 
   int32_t GetFillRule() const { return mFillRule; }
   void SetFillRule(int32_t aFillRule)
@@ -3465,6 +3466,7 @@ struct nsStyleSVGReset
   static nsChangeHint MaxDifference() {
     return nsChangeHint_UpdateEffects |
            nsChangeHint_UpdateOverflow |
+           nsChangeHint_UpdateContainingBlock |
            nsChangeHint_NeutralChange |
            NS_STYLE_HINT_REFLOW;
   }

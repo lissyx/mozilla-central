@@ -142,6 +142,7 @@ public:
     , mIterating(false)
   {}
 
+  virtual const char* Name() const override { return "TextureImageTextureSourceOGL"; }
   // DataTextureSource
 
   virtual bool Update(gfx::DataSourceSurface* aSurface,
@@ -236,6 +237,8 @@ public:
                   bool aExternallyOwned = false);
 
   ~GLTextureSource();
+
+  virtual const char* Name() const override { return "GLTextureSource"; }
 
   virtual GLTextureSource* AsGLTextureSource() override { return this; }
 
@@ -344,6 +347,8 @@ public:
                        GLenum aWrapMode,
                        gfx::IntSize aSize);
 
+  virtual const char* Name() const override { return "SurfaceTextureSource"; }
+
   virtual TextureSourceOGL* AsSourceOGL() { return this; }
 
   virtual void BindTexture(GLenum activetex, gfx::Filter aFilter) override;
@@ -369,7 +374,7 @@ public:
 
 protected:
   RefPtr<CompositorOGL> mCompositor;
-  mozilla::gl::AndroidSurfaceTexture* const mSurfTex;
+  RefPtr<gl::AndroidSurfaceTexture> const mSurfTex;
   const gfx::SurfaceFormat mFormat;
   const GLenum mTextureTarget;
   const GLenum mWrapMode;
@@ -414,7 +419,7 @@ public:
   virtual const char* Name() { return "SurfaceTextureHost"; }
 
 protected:
-  mozilla::gl::AndroidSurfaceTexture* const mSurfTex;
+  RefPtr<gl::AndroidSurfaceTexture> const mSurfTex;
   const gfx::IntSize mSize;
   RefPtr<CompositorOGL> mCompositor;
   RefPtr<SurfaceTextureSource> mTextureSource;
@@ -435,6 +440,8 @@ public:
                         GLenum aTarget,
                         GLenum aWrapMode,
                         gfx::IntSize aSize);
+
+  virtual const char* Name() const override { return "EGLImageTextureSource"; }
 
   virtual TextureSourceOGL* AsSourceOGL() override { return this; }
 

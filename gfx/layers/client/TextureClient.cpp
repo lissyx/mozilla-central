@@ -820,7 +820,8 @@ TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
                                         TextureFlags aTextureFlags,
                                         TextureAllocationFlags aAllocFlags)
 {
-  MOZ_ASSERT(aAllocator->IPCOpen());
+  // also test the validity of aAllocator
+  MOZ_ASSERT(aAllocator && aAllocator->IPCOpen());
   if (!aAllocator || !aAllocator->IPCOpen()) {
     return nullptr;
   }
@@ -831,6 +832,13 @@ TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
 
   if (!gfx::Factory::AllowedSurfaceSize(aSize)) {
     return nullptr;
+  }
+
+  if (aFormat == SurfaceFormat::B8G8R8X8 &&
+      (aAllocFlags != TextureAllocationFlags::ALLOC_CLEAR_BUFFER_BLACK) &&
+      aMoz2DBackend == gfx::BackendType::SKIA) {
+    // skia requires alpha component of RGBX textures to be 255.
+    aAllocFlags = TextureAllocationFlags::ALLOC_CLEAR_BUFFER_WHITE;
   }
 
   TextureData* texData = BufferTextureData::Create(aSize, aFormat, aMoz2DBackend,
