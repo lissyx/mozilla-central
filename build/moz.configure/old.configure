@@ -4,21 +4,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-# It feels dirty replicating this from python/mozbuild/mozbuild/mozconfig.py,
-# but the end goal being that the configure script would go away...
-@depends('MOZILLABUILD')
-@advanced
-def shell(mozillabuild):
-    import sys
-
-    shell = 'sh'
-    if mozillabuild:
-        shell = mozillabuild[0] + '/msys/bin/sh'
-    if sys.platform == 'win32':
-        shell = shell + '.exe'
-    return shell
-
-
 @template
 @advanced
 def encoded_open(path, mode):
@@ -55,22 +40,51 @@ def autoconf(mozconfig, autoconf):
                 break
     else:
         fink = find_program('fink')
-        if find:
+        if fink:
             autoconf = os.path.normpath(os.path.join(
                 fink, '..', '..', 'lib', 'autoconf2.13', 'bin', 'autoconf'))
+        else:
+            brew = find_program('brew')
+            if brew:
+                autoconf = os.path.normpath(os.path.join(
+                    brew, '..', '..', 'Cellar', 'autoconf213', '2.13', 'bin',
+                    'autoconf213'))
 
     if not autoconf:
         error('Could not find autoconf 2.13')
+
+    if not os.path.exists(autoconf):
+        error('Could not find autoconf 2.13 at %s' % (autoconf,))
 
     set_config('AUTOCONF', autoconf)
     return autoconf
 
 
+# See comment in mozconfig_options() from build/moz.configure/init.configure
+@template
+@advanced
+def check_mozconfig_variables():
+    # This escapes the sandbox. Don't copy this. This is only here because it
+    # is a one off until old-configure is gone.
+    all_options = depends.__self__._options.itervalues()
+
+    @depends(early_options, wanted_mozconfig_variables)
+    def check_mozconfig_variables(early_options, wanted_mozconfig_variables):
+        for option in all_options:
+            if (option.env and option.env not in early_options and
+                    option.env not in wanted_mozconfig_variables):
+                error(
+                    'You need to add `%s` to the `wanted_mozconfig_variables` '
+                    'list in build/moz.configure/init.configure.' % option.env)
+
+check_mozconfig_variables()
+
+
 @depends('OLD_CONFIGURE', mozconfig, autoconf, check_build_environment, shell,
-         old_configure_assignments)
+         old_configure_assignments, build_project)
 @advanced
 def prepare_configure(old_configure, mozconfig, autoconf, build_env, shell,
-                      old_configure_assignments):
+                      old_configure_assignments, build_project):
     import glob
     import itertools
     import subprocess
@@ -84,6 +98,11 @@ def prepare_configure(old_configure, mozconfig, autoconf, build_env, shell,
     # as $0, and backslashes there breaks autoconf's detection of the source
     # directory.
     old_configure = os.path.abspath(old_configure[0])
+    if build_project == 'js':
+        old_configure_dir = os.path.dirname(old_configure)
+        if not old_configure_dir.endswith('/js/src'):
+            old_configure = os.path.join(old_configure_dir, 'js', 'src',
+                                         os.path.basename(old_configure))
 
     refresh = True
     if os.path.exists(old_configure):
@@ -122,6 +141,10 @@ def prepare_configure(old_configure, mozconfig, autoconf, build_env, shell,
             for t in ('env', 'vars'):
                 for key in mozconfig[t]['removed'].keys():
                     print("unset %s" % key, file=out)
+
+        # Autoconf is special, because it might be passed from
+        # mozconfig['make_extra'], which we don't pass automatically above.
+        print('export AUTOCONF=%s' % quote(autoconf), file=out)
 
         for assignment in old_configure_assignments:
             print(assignment, file=out)
@@ -277,13 +300,10 @@ def old_configure_options(*options):
     '--enable-webspeech',
     '--enable-webspeechtestbackend',
     '--enable-wmf',
-    '--enable-xterm-updates',
     '--enable-xul',
     '--enable-zipwriter',
-    '--host',
     '--no-create',
     '--prefix',
-    '--target',
     '--with-adjust-sdk-keyfile',
     '--with-android-cxx-stl',
     '--with-android-distribution-directory',
@@ -329,6 +349,7 @@ def old_configure_options(*options):
     '--with-macos-private-frameworks',
     '--with-macos-sdk',
     '--with-mozilla-api-keyfile',
+    '--with-nspr-prefix',
     '--with-nspr-cflags',
     '--with-nspr-libs',
     '--with-pthreads',

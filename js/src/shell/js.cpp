@@ -2737,7 +2737,7 @@ EvalInContext(JSContext* cx, unsigned argc, Value* vp)
         return true;
     }
 
-    JS::UniqueChars filename;
+    JS::AutoFilename filename;
     unsigned lineno;
 
     DescribeScriptedCaller(cx, &filename, &lineno);
@@ -3812,7 +3812,7 @@ runOffThreadScript(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::AutoFinishGC finishgc(rt);
+        gc::FinishGC(rt);
 
     void* token = offThreadState.waitUntilDone(cx, ScriptKind::Script);
     if (!token) {
@@ -3914,7 +3914,7 @@ FinishOffThreadModule(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::AutoFinishGC finishgc(rt);
+        gc::FinishGC(rt);
 
     void* token = offThreadState.waitUntilDone(cx, ScriptKind::Module);
     if (!token) {
@@ -4166,7 +4166,7 @@ ThisFilename(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    JS::UniqueChars filename;
+    JS::AutoFilename filename;
     if (!DescribeScriptedCaller(cx, &filename) || !filename.get()) {
         args.rval().setString(cx->runtime()->emptyString);
         return true;

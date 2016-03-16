@@ -8332,6 +8332,8 @@ CodeGenerator::generateAsmJS(wasm::FuncOffsets* offsets)
         return false;
 
     masm.flush();
+    if (masm.oom())
+        return false;
 
     offsets->end = masm.currentOffset();
 
@@ -10625,6 +10627,13 @@ CodeGenerator::visitAsmJSInterruptCheck(LAsmJSInterruptCheck* lir)
     masm.branchIfFalseBool(ReturnReg, wasm::JumpTarget::Throw);
 
     masm.bind(&rejoin);
+}
+
+void
+CodeGenerator::visitAsmThrowUnreachable(LAsmThrowUnreachable* lir)
+{
+    MOZ_ASSERT(gen->compilingAsmJS());
+    masm.jump(wasm::JumpTarget::UnreachableTrap);
 }
 
 typedef bool (*RecompileFn)(JSContext*);

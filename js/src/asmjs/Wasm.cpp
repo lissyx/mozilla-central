@@ -185,6 +185,13 @@ DecodeNop(FunctionDecoder& f, ExprType* type)
 }
 
 static bool
+DecodeUnreachable(FunctionDecoder& f, ExprType* type)
+{
+    *type = AnyType;
+    return true;
+}
+
+static bool
 DecodeCallWithSig(FunctionDecoder& f, const Sig& sig, ExprType* type)
 {
     for (ValType argType : sig.args()) {
@@ -784,8 +791,7 @@ DecodeExpr(FunctionDecoder& f, ExprType* type)
         return f.fail("NYI: reinterpret");
       case Expr::F32ConvertSI64:
       case Expr::F32ConvertUI64:
-        return f.fail("NYI: i64") &&
-               DecodeConversionOperator(f, ValType::F32, ValType::I64, type);
+        return DecodeConversionOperator(f, ValType::F32, ValType::I64, type);
       case Expr::F32DemoteF64:
         return DecodeConversionOperator(f, ValType::F32, ValType::F64, type);
       case Expr::F64ConvertSI32:
@@ -793,9 +799,9 @@ DecodeExpr(FunctionDecoder& f, ExprType* type)
         return DecodeConversionOperator(f, ValType::F64, ValType::I32, type);
       case Expr::F64ConvertSI64:
       case Expr::F64ConvertUI64:
+        return DecodeConversionOperator(f, ValType::F64, ValType::I64, type);
       case Expr::F64ReinterpretI64:
-        return f.fail("NYI: i64") &&
-               DecodeConversionOperator(f, ValType::F64, ValType::I64, type);
+        return f.fail("NYI: i64");
       case Expr::F64PromoteF32:
         return DecodeConversionOperator(f, ValType::F64, ValType::F32, type);
       case Expr::I32Load8S:
@@ -843,6 +849,8 @@ DecodeExpr(FunctionDecoder& f, ExprType* type)
         return DecodeBrTable(f, type);
       case Expr::Return:
         return DecodeReturn(f, type);
+      case Expr::Unreachable:
+        return DecodeUnreachable(f, type);
       default:
         // Note: it's important not to remove this default since readExpr()
         // can return Expr values for which there is no enumerator.
@@ -1572,8 +1580,12 @@ wasm::Eval(JSContext* cx, Handle<TypedArrayObject*> code, HandleObject importObj
         bytes = copy.begin();
     }
 
-    UniqueChars file;
-    if (!DescribeScriptedCaller(cx, &file))
+    JS::AutoFilename filename;
+    if (!DescribeScriptedCaller(cx, &filename))
+        return false;
+
+    UniqueChars file = DuplicateString(filename.get());
+    if (!file)
         return false;
 
     ImportNameVector importNames;

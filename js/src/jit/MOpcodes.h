@@ -121,6 +121,7 @@ namespace jit {
     _(TruncateToInt64)                                                      \
     _(WrapInt64ToInt32)                                                     \
     _(ExtendInt32ToInt64)                                                   \
+    _(Int64ToFloatingPoint)                                                 \
     _(ToString)                                                             \
     _(ToObjectOrNull)                                                       \
     _(NewArray)                                                             \
@@ -253,6 +254,7 @@ namespace jit {
     _(CallInstanceOf)                                                       \
     _(InterruptCheck)                                                       \
     _(AsmJSInterruptCheck)                                                  \
+    _(AsmThrowUnreachable)                                                  \
     _(GetDOMProperty)                                                       \
     _(GetDOMMember)                                                         \
     _(SetDOMProperty)                                                       \

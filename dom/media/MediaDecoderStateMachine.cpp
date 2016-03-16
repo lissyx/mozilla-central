@@ -48,6 +48,7 @@
 #include "TimeUnits.h"
 #include "VideoSegment.h"
 #include "VideoUtils.h"
+#include "gfxPrefs.h"
 
 namespace mozilla {
 
@@ -175,10 +176,15 @@ static int64_t DurationToUsecs(TimeDuration aDuration) {
 
 static const uint32_t MIN_VIDEO_QUEUE_SIZE = 3;
 static const uint32_t MAX_VIDEO_QUEUE_SIZE = 10;
+#ifdef MOZ_APPLEMEDIA
+static const uint32_t HW_VIDEO_QUEUE_SIZE = 10;
+#else
+static const uint32_t HW_VIDEO_QUEUE_SIZE = 3;
+#endif
 static const uint32_t VIDEO_QUEUE_SEND_TO_COMPOSITOR_SIZE = 9999;
 
 static uint32_t sVideoQueueDefaultSize = MAX_VIDEO_QUEUE_SIZE;
-static uint32_t sVideoQueueHWAccelSize = MIN_VIDEO_QUEUE_SIZE;
+static uint32_t sVideoQueueHWAccelSize = HW_VIDEO_QUEUE_SIZE;
 static uint32_t sVideoQueueSendToCompositorSize = VIDEO_QUEUE_SEND_TO_COMPOSITOR_SIZE;
 
 static void InitVideoQueuePrefs() {
@@ -189,7 +195,7 @@ static void InitVideoQueuePrefs() {
     sVideoQueueDefaultSize = Preferences::GetUint(
       "media.video-queue.default-size", MAX_VIDEO_QUEUE_SIZE);
     sVideoQueueHWAccelSize = Preferences::GetUint(
-      "media.video-queue.hw-accel-size", MIN_VIDEO_QUEUE_SIZE);
+      "media.video-queue.hw-accel-size", HW_VIDEO_QUEUE_SIZE);
     sVideoQueueSendToCompositorSize = Preferences::GetUint(
       "media.video-queue.send-to-compositor-size", VIDEO_QUEUE_SEND_TO_COMPOSITOR_SIZE);
   }
@@ -2419,7 +2425,7 @@ MediaDecoderStateMachine::CheckFrameValidity(VideoData* aData)
   MOZ_ASSERT(OnTaskQueue());
 
   // Update corrupt-frames statistics
-  if (aData->mImage && !aData->mImage->IsValid()) {
+  if (aData->mImage && !aData->mImage->IsValid() && !gfxPrefs::HardwareVideoDecodingForceEnabled()) {
     FrameStatistics& frameStats = *mFrameStats;
     frameStats.NotifyCorruptFrame();
     // If more than 10% of the last 30 frames have been corrupted, then try disabling
