@@ -298,7 +298,7 @@ pref("ui.dragThresholdY", 25);
 // Layers Acceleration.  We can only have nice things on gonk, because
 // they're not maintained anywhere else.
 #ifndef MOZ_WIDGET_GONK
-pref("dom.ipc.tabs.disabled", true);
+pref("dom.ipc.tabs.disabled", false);
 #else
 pref("dom.ipc.tabs.disabled", false);
 pref("layers.acceleration.disabled", false);
