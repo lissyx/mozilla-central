@@ -5284,8 +5284,7 @@ void PresShell::UpdateCanvasBackground()
                                                drawBackgroundImage,
                                                drawBackgroundColor);
     mHasCSSBackgroundColor = drawBackgroundColor;
-    if (GetPresContext()->IsCrossProcessRootContentDocument() &&
-        !IsTransparentContainerElement(mPresContext)) {
+    if (!IsTransparentContainerElement(mPresContext)) {
       mCanvasBackgroundColor =
         NS_ComposeColors(GetDefaultBackgroundColorToDraw(), mCanvasBackgroundColor);
     }
