@@ -473,6 +473,8 @@ public:
 
   void GetDefaultScale(double *aScale);
 
+  bool IsTransparent() const { return mIsTransparent; }
+
   void GetMaxTouchPoints(uint32_t* aTouchPoints);
 
   ScreenOrientationInternal GetOrientation() const { return mOrientation; }
@@ -747,6 +749,8 @@ private:
   friend class ContentChild;
   float mDPI;
   double mDefaultScale;
+
+  bool mIsTransparent;
 
   bool mIPCOpen;
   bool mParentIsActive;

@@ -5284,7 +5284,9 @@ void PresShell::UpdateCanvasBackground()
                                                drawBackgroundImage,
                                                drawBackgroundColor);
     mHasCSSBackgroundColor = drawBackgroundColor;
-    if (!IsTransparentContainerElement(mPresContext)) {
+    TabChild* tab = TabChild::GetFrom(this);
+    if (!IsTransparentContainerElement(mPresContext) &&
+        !(tab && tab->IsTransparent())) {
       mCanvasBackgroundColor =
         NS_ComposeColors(GetDefaultBackgroundColorToDraw(), mCanvasBackgroundColor);
     }
