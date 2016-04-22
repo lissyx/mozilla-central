@@ -430,7 +430,7 @@ partial interface Navigator {
 };
 
 partial interface Navigator {
-  [NewObject, Pref="dom.mozTCPSocket.enabled", CheckAnyPermissions="tcp-socket"]
+  [NewObject]
   readonly attribute LegacyMozTCPSocket mozTCPSocket;
 };
 
