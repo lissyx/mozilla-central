@@ -1222,7 +1222,5 @@ TCPSocket::ShouldTCPSocketExist(JSContext* aCx, JSObject* aGlobal)
     return true;
   }
 
-  const char* const perms[] = { "tcp-socket", nullptr };
-  return Preferences::GetBool("dom.mozTCPSocket.enabled") &&
-      CheckAnyPermissions(aCx, global, perms);
+  return Preferences::GetBool("dom.mozTCPSocket.enabled");
 }
