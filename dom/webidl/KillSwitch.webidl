@@ -15,8 +15,7 @@
 
 [JSImplementation="@mozilla.org/moz-kill-switch;1",
  NavigatorProperty="mozKillSwitch",
- AvailableIn="CertifiedApps",
- CheckAnyPermissions="killswitch",
+ ChromeOnly,
  Pref="dom.mozKillSwitch.enabled"]
 interface KillSwitch {
   Promise<any> enable();
