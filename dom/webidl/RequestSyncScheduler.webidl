@@ -23,7 +23,7 @@ dictionary RequestTaskFull : RequestTaskParams {
 };
 
 [NavigatorProperty="sync",
- AvailableIn=CertifiedApps,
+ ChromeOnly,
  Pref="dom.requestSync.enabled",
  JSImplementation="@mozilla.org/dom/request-sync-scheduler;1"]
 interface RequestSyncScheduler {
