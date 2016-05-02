@@ -2,9 +2,8 @@
 
 SimpleTest.waitForExplicitFinish();
 browserElementTestHelpers.setEnabledPref(true);
-browserElementTestHelpers.addPermission();
 
-var fileURL = 'http://example.org/tests/dom/browser-element/mochitest/file_browserElement_AudioChannelSeeking.html';
+var fileURL = 'chrome://mochitests/content/chrome/dom/browser-element/mochitest/file_browserElement_AudioChannelSeeking.html';
 var generator = runTests();
 var testFrame;
 var ac;

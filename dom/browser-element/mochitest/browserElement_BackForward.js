@@ -7,7 +7,6 @@
 "use strict";
 SimpleTest.waitForExplicitFinish();
 browserElementTestHelpers.setEnabledPref(true);
-browserElementTestHelpers.addPermission();
 
 var iframe;
 function addOneShotIframeEventListener(event, fn) {
@@ -27,7 +26,7 @@ function runTest() {
     SimpleTest.executeSoon(test2);
   });
 
-  iframe.src = browserElementTestHelpers.emptyPage1;
+  iframe.src = browserElementTestHelpers.emptyPage1Chrome;
   document.body.appendChild(iframe);
 }
 
@@ -90,7 +89,7 @@ function test5() {
 
 function test6() {
   addOneShotIframeEventListener('mozbrowserlocationchange', function(e) {
-    is(e.detail, browserElementTestHelpers.emptyPage1);
+    is(e.detail, browserElementTestHelpers.emptyPage1Chrome);
     checkCanGoBackAndForward(false, true, SimpleTest.finish);
   });
   iframe.goBack();

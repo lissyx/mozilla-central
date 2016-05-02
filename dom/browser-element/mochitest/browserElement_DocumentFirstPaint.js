@@ -6,7 +6,6 @@
 
 SimpleTest.waitForExplicitFinish();
 browserElementTestHelpers.setEnabledPref(true);
-browserElementTestHelpers.addPermission();
 
 var iframe;
 
@@ -48,7 +47,7 @@ function runTestQueue(queue) {
 }
 
 function testChangeLocation() {
-  iframe.src = browserElementTestHelpers.emptyPage1 + "?2";
+  iframe.src = browserElementTestHelpers.emptyPage1Chrome + "?2";
 }
 
 function testReload() {
@@ -57,7 +56,7 @@ function testReload() {
 
 function testFirstLoad() {
   document.body.appendChild(iframe);
-  iframe.src = browserElementTestHelpers.emptyPage1;
+  iframe.src = browserElementTestHelpers.emptyPage1Chrome;
 }
 
 function runTest() {

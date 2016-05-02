@@ -7,14 +7,13 @@
 
 SimpleTest.waitForExplicitFinish();
 browserElementTestHelpers.setEnabledPref(true);
-browserElementTestHelpers.addPermission();
 
 function noaudio() {
   info("Test : no-audio");
   var iframe = document.createElement('iframe');
   iframe.setAttribute('mozbrowser', 'true');
   iframe.setAttribute('mozapp', 'http://example.org/manifest.webapp');
-  iframe.src = 'http://example.org/tests/dom/browser-element/mochitest/file_empty.html';
+  iframe.src = 'chrome://mochitests/content/chrome/dom/browser-element/mochitest/file_empty.html';
 
   function noaudio_loadend() {
     ok("mute" in iframe, "iframe.mute exists");
@@ -148,7 +147,7 @@ function audio() {
   var iframe = document.createElement('iframe');
   iframe.setAttribute('mozbrowser', 'true');
   iframe.setAttribute('mozapp', 'http://example.org/manifest.webapp');
-  iframe.src = 'http://example.org/tests/dom/browser-element/mochitest/iframe_file_audio.html';
+  iframe.src = 'chrome://mochitests/content/chrome/dom/browser-element/mochitest/iframe_file_audio.html';
 
   function audio_loadend() {
     ok("mute" in iframe, "iframe.mute exists");

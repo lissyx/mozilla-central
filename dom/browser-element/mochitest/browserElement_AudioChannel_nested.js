@@ -7,7 +7,6 @@
 
 SimpleTest.waitForExplicitFinish();
 browserElementTestHelpers.setEnabledPref(true);
-browserElementTestHelpers.addPermission();
 
 function runTests() {
   var iframe = document.createElement('iframe');
@@ -67,7 +66,7 @@ function runTests() {
     {'type': 'browser', 'allow': 1, 'context': context},
     {'type': 'embed-apps', 'allow': 1, 'context': context}
   ], function() {
-    iframe.src = 'http://example.org/tests/dom/browser-element/mochitest/file_browserElement_AudioChannel_nested.html';
+    iframe.src = 'chrome://mochitests/content/chrome/dom/browser-element/mochitest/file_browserElement_AudioChannel_nested.html';
   });
 }
 

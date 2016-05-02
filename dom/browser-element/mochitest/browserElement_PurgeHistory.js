@@ -7,7 +7,6 @@
 "use strict";
 SimpleTest.waitForExplicitFinish();
 browserElementTestHelpers.setEnabledPref(true);
-browserElementTestHelpers.addPermission();
 
 var iframe;
 function addOneShotIframeEventListener(event, fn) {
@@ -27,7 +26,8 @@ function runTest() {
     SimpleTest.executeSoon(test2);
   });
 
-  iframe.src = browserElementTestHelpers.emptyPage1;
+  ok(true, "setting iframe.src=" + browserElementTestHelpers.emptyPage1Chrome);
+  iframe.src = browserElementTestHelpers.emptyPage1Chrome;
   document.body.appendChild(iframe);
 }
 
@@ -68,6 +68,7 @@ function test3() {
   });
 
   SimpleTest.executeSoon(function() {
+  ok(true, "setting iframe.src=" + browserElementTestHelpers.emptyPage2);
     iframe.src = browserElementTestHelpers.emptyPage2;
   });
 }
@@ -79,6 +80,7 @@ function test4() {
   });
 
   SimpleTest.executeSoon(function() {
+  ok(true, "setting iframe.src=" + browserElementTestHelpers.emptyPage3);
     iframe.src = browserElementTestHelpers.emptyPage3;
   });
 }

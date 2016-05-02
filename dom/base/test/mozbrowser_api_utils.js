@@ -1,4 +1,9 @@
-const FRAME_URL = "http://example.org/";
+var FRAME_URL;
+if (window.location.protocol === "chrome:") {
+  FRAME_URL = "chrome://mochikit/content/tests/SimpleTest/";
+} else {
+  FRAME_URL = "http://example.org/";
+}
 
 const METHODS = {
   setVisible: {},
@@ -20,12 +25,12 @@ const METHODS = {
   getCanGoBack: {},
   getCanGoForward: {},
   getContentDimensions: {},
-  setInputMethodActive: { alwaysFails: true }, // needs input-manage
-  setNFCFocus: { alwaysFails: true }, // needs nfc-manager
+  setInputMethodActive: {},
+  setNFCFocus: {},
   findAll: {},
   findNext: {},
   clearMatch: {},
-  executeScript: { alwaysFails: true }, // needs browser:universalxss
+  executeScript: {},
   getStructuredData: {},
   getWebManifest: {},
   mute: {},
