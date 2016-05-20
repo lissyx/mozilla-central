@@ -1505,11 +1505,11 @@ class ReservedRooted : public ReservedRootedBase<T>
     }
 
     explicit ReservedRooted(Rooted<T>* root) : savedRoot(root) {
-        *root = js::GCPolicy<T>::initial();
+        *root = JS::GCPolicy<T>::initial();
     }
 
     ~ReservedRooted() {
-        *savedRoot = js::GCPolicy<T>::initial();
+        *savedRoot = JS::GCPolicy<T>::initial();
     }
 
     void set(const T& p) const { *savedRoot = p; }
@@ -1629,6 +1629,42 @@ Interpret(JSContext* cx, RunState& state)
         ADVANCE_AND_DISPATCH(nlen);                                           \
     JS_END_MACRO
 
+    /*
+     * Initialize code coverage vectors.
+     */
+#define INIT_COVERAGE()                                                       \
+    JS_BEGIN_MACRO                                                            \
+        if (!script->hasScriptCounts() && cx->compartment()->collectCoverage()) { \
+            if (!script->initScriptCounts(cx))                                \
+                goto error;                                                   \
+        }                                                                     \
+    JS_END_MACRO
+
+    /*
+     * Increment the code coverage counter associated with the given pc.
+     */
+#define COUNT_COVERAGE_PC(PC)                                                 \
+    JS_BEGIN_MACRO                                                            \
+        if (script->hasScriptCounts()) {                                      \
+            PCCounts* counts = script->maybeGetPCCounts(PC);                  \
+            MOZ_ASSERT(counts);                                               \
+            counts->numExec()++;                                              \
+        }                                                                     \
+    JS_END_MACRO
+
+#define COUNT_COVERAGE_MAIN()                                                 \
+    JS_BEGIN_MACRO                                                            \
+        jsbytecode* main = script->main();                                    \
+        if (!BytecodeIsJumpTarget(JSOp(*main)))                               \
+            COUNT_COVERAGE_PC(main);                                          \
+    JS_END_MACRO
+
+#define COUNT_COVERAGE()                                                      \
+    JS_BEGIN_MACRO                                                            \
+        MOZ_ASSERT(BytecodeIsJumpTarget(JSOp(*REGS.pc)));                     \
+        COUNT_COVERAGE_PC(REGS.pc);                                           \
+    JS_END_MACRO
+
 #define LOAD_DOUBLE(PCOFF, dbl)                                               \
     ((dbl) = script->getConst(GET_UINT32_INDEX(REGS.pc + (PCOFF))).toDouble())
 
@@ -1642,8 +1678,6 @@ Interpret(JSContext* cx, RunState& state)
 #define SANITY_CHECKS()                                                       \
     JS_BEGIN_MACRO                                                            \
         js::gc::MaybeVerifyBarriers(cx);                                      \
-        MOZ_ASSERT_IF(script->hasScriptCounts(),                              \
-                      activation.opMask() == EnableInterruptsPseudoOpcode);   \
     JS_END_MACRO
 
     gc::MaybeVerifyBarriers(cx, true);
@@ -1704,8 +1738,9 @@ Interpret(JSContext* cx, RunState& state)
         MOZ_CRASH("bad Debugger::onEnterFrame status");
     }
 
-    if (cx->compartment()->collectCoverage())
-        activation.enableInterruptsUnconditionally();
+    // Increment the coverage for the main entry point.
+    INIT_COVERAGE();
+    COUNT_COVERAGE_MAIN();
 
     // Enter the interpreter loop starting at the current pc.
     ADVANCE_AND_DISPATCH(0);
@@ -1720,13 +1755,6 @@ CASE(EnableInterruptsPseudoOpcode)
     if (!script->hasScriptCounts() && cx->compartment()->collectCoverage()) {
         if (!script->initScriptCounts(cx))
             goto error;
-        moreInterrupts = true;
-    }
-
-    if (script->hasScriptCounts()) {
-        PCCounts* counts = script->maybeGetPCCounts(REGS.pc);
-        if (counts)
-            counts->numExec()++;
         moreInterrupts = true;
     }
 
@@ -1789,9 +1817,10 @@ CASE(EnableInterruptsPseudoOpcode)
 
 /* Various 1-byte no-ops. */
 CASE(JSOP_NOP)
+CASE(JSOP_NOP_DESTRUCTURING)
 CASE(JSOP_UNUSED14)
 CASE(JSOP_UNUSED65)
-CASE(JSOP_BACKPATCH)
+CASE(JSOP_UNUSED149)
 CASE(JSOP_UNUSED179)
 CASE(JSOP_UNUSED180)
 CASE(JSOP_UNUSED181)
@@ -1809,19 +1838,25 @@ CASE(JSOP_UNUSED221)
 CASE(JSOP_UNUSED222)
 CASE(JSOP_UNUSED223)
 CASE(JSOP_CONDSWITCH)
-CASE(JSOP_TRY)
 {
     MOZ_ASSERT(CodeSpec[*REGS.pc].length == 1);
     ADVANCE_AND_DISPATCH(1);
 }
 
+CASE(JSOP_TRY)
+CASE(JSOP_JUMPTARGET)
 CASE(JSOP_LOOPHEAD)
-END_CASE(JSOP_LOOPHEAD)
+{
+    MOZ_ASSERT(CodeSpec[*REGS.pc].length == 1);
+    COUNT_COVERAGE();
+    ADVANCE_AND_DISPATCH(1);
+}
 
 CASE(JSOP_LABEL)
 END_CASE(JSOP_LABEL)
 
 CASE(JSOP_LOOPENTRY)
+    COUNT_COVERAGE();
     // Attempt on-stack replacement with Baseline code.
     if (jit::IsBaselineEnabled(cx)) {
         jit::MethodStatus status = jit::CanEnterBaselineAtBranch(cx, REGS.fp(), false);
@@ -2076,6 +2111,7 @@ END_CASE(JSOP_ISNOITER)
 CASE(JSOP_ENDITER)
 {
     MOZ_ASSERT(REGS.stackDepth() >= 1);
+    COUNT_COVERAGE();
     ReservedRooted<JSObject*> obj(&rootObject0, &REGS.sp[-1].toObject());
     bool ok = CloseIterator(cx, obj);
     REGS.sp--;
@@ -2917,6 +2953,10 @@ CASE(JSOP_FUNCALL)
         MOZ_CRASH("bad Debugger::onEnterFrame status");
     }
 
+    // Increment the coverage for the main entry point.
+    INIT_COVERAGE();
+    COUNT_COVERAGE_MAIN();
+
     /* Load first op and dispatch it (safe since JSOP_RETRVAL). */
     ADVANCE_AND_DISPATCH(0);
 }
@@ -3363,7 +3403,8 @@ CASE(JSOP_LAMBDA)
     JSObject* obj = Lambda(cx, fun, REGS.fp()->scopeChain());
     if (!obj)
         goto error;
-    MOZ_ASSERT(obj->getProto());
+
+    MOZ_ASSERT(obj->staticPrototype());
     PUSH_OBJECT(*obj);
 }
 END_CASE(JSOP_LAMBDA)
@@ -3376,7 +3417,8 @@ CASE(JSOP_LAMBDA_ARROW)
     JSObject* obj = LambdaArrow(cx, fun, REGS.fp()->scopeChain(), newTarget);
     if (!obj)
         goto error;
-    MOZ_ASSERT(obj->getProto());
+
+    MOZ_ASSERT(obj->staticPrototype());
     REGS.sp[-1].setObject(*obj);
 }
 END_CASE(JSOP_LAMBDA_ARROW)
@@ -4219,7 +4261,7 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain,
         parent = parent->enclosingScope();
 
     /* ES5 10.5 (NB: with subsequent errata). */
-    RootedPropertyName name(cx, fun->atom()->asPropertyName());
+    RootedPropertyName name(cx, fun->name()->asPropertyName());
 
     RootedShape shape(cx);
     RootedObject pobj(cx);
@@ -4931,8 +4973,8 @@ js::ThrowUninitializedThis(JSContext* cx, AbstractFramePtr frame)
     if (fun->isDerivedClassConstructor()) {
         const char* name = "anonymous";
         JSAutoByteString str;
-        if (fun->atom()) {
-            if (!AtomToPrintableString(cx, fun->atom(), &str))
+        if (fun->name()) {
+            if (!AtomToPrintableString(cx, fun->name(), &str))
                 return false;
             name = str.ptr();
         }

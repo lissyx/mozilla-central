@@ -41,6 +41,7 @@ namespace layers {
 class BufferDescriptor;
 class Compositor;
 class CompositableParentManager;
+class CompositorBridgeParent;
 class SurfaceDescriptor;
 class ISurfaceAllocator;
 class TextureHostOGL;
@@ -111,7 +112,10 @@ public:
   /**
    * Cast to a TextureSource for for each backend..
    */
-  virtual TextureSourceOGL* AsSourceOGL() { return nullptr; }
+  virtual TextureSourceOGL* AsSourceOGL() {
+    gfxCriticalNote << "Failed to cast " << Name() << " into a TextureSourceOGL";
+    return nullptr;
+  }
   virtual TextureSourceD3D9* AsSourceD3D9() { return nullptr; }
   virtual TextureSourceD3D11* AsSourceD3D11() { return nullptr; }
   virtual TextureSourceBasic* AsSourceBasic() { return nullptr; }
@@ -478,7 +482,7 @@ public:
    * are for use with the managing IPDL protocols only (so that they can
    * implement AllocPTextureParent and DeallocPTextureParent).
    */
-  static PTextureParent* CreateIPDLActor(CompositableParentManager* aManager,
+  static PTextureParent* CreateIPDLActor(ISurfaceAllocator* aAllocator,
                                          const SurfaceDescriptor& aSharedData,
                                          LayersBackend aLayersBackend,
                                          TextureFlags aFlags);
