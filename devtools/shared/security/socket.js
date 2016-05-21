@@ -47,8 +47,7 @@ DevToolsUtils.defineLazyGetter(this, "nssErrorsService", () => {
          .getService(Ci.nsINSSErrorsService);
 });
 
-DevToolsUtils.defineLazyModuleGetter(this, "Task",
-  "resource://gre/modules/Task.jsm");
+const { Task } = require("devtools/shared/task");
 
 var DebuggerSocket = {};
 
@@ -675,7 +674,7 @@ ServerSocketConnection.prototype = {
      * cipher negotiation to work correctly.  The server already allows only
      * Gecko's normal set of cipher suites.
      */
-    if (clientStatus.tlsVersionUsed != Ci.nsITLSClientStatus.TLS_VERSION_1_2) {
+    if (clientStatus.tlsVersionUsed < Ci.nsITLSClientStatus.TLS_VERSION_1_2) {
       this._handshakeDeferred.reject(Cr.NS_ERROR_CONNECTION_REFUSED);
       return;
     }
