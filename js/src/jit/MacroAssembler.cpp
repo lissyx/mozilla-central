@@ -865,7 +865,7 @@ MacroAssembler::allocateObject(Register result, Register temp, gc::AllocKind all
     if (!nDynamicSlots)
         return freeListAllocate(result, temp, allocKind, fail);
 
-    callMallocStub(nDynamicSlots * sizeof(HeapValue), temp, fail);
+    callMallocStub(nDynamicSlots * sizeof(GCPtrValue), temp, fail);
 
     Label failAlloc;
     Label success;
@@ -957,16 +957,16 @@ MacroAssembler::fillSlotsWithConstantValue(Address base, Register temp,
 
     Address addr = base;
     move32(Imm32(jv.s.payload.i32), temp);
-    for (unsigned i = start; i < end; ++i, addr.offset += sizeof(HeapValue))
+    for (unsigned i = start; i < end; ++i, addr.offset += sizeof(GCPtrValue))
         store32(temp, ToPayload(addr));
 
     addr = base;
     move32(Imm32(jv.s.tag), temp);
-    for (unsigned i = start; i < end; ++i, addr.offset += sizeof(HeapValue))
+    for (unsigned i = start; i < end; ++i, addr.offset += sizeof(GCPtrValue))
         store32(temp, ToType(addr));
 #else
     moveValue(v, temp);
-    for (uint32_t i = start; i < end; ++i, base.offset += sizeof(HeapValue))
+    for (uint32_t i = start; i < end; ++i, base.offset += sizeof(GCPtrValue))
         storePtr(temp, base);
 #endif
 }
@@ -1518,7 +1518,10 @@ MacroAssembler::printf(const char* output)
 
 static void
 Printf1_(const char* output, uintptr_t value) {
+    AutoEnterOOMUnsafeRegion oomUnsafe;
     char* line = JS_sprintf_append(nullptr, output, value);
+    if (!line)
+        oomUnsafe.crash("OOM at masm.printf");
     fprintf(stderr, "%s", line);
     js_free(line);
 }

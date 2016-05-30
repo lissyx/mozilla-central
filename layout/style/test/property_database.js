@@ -2404,13 +2404,32 @@ var gCSSProperties = {
       "no-repeat repeat",
       "no-repeat no-repeat",
       "repeat repeat, repeat repeat",
+      "round, repeat",
+      "round repeat, repeat-x",
+      "round no-repeat, repeat-y",
+      "round round",
+      "space, repeat",
+      "space repeat, repeat-x",
+      "space no-repeat, repeat-y",
+      "space space",
+      "space round"
     ],
     invalid_values: [ "repeat repeat repeat",
                       "repeat-x repeat-y",
                       "repeat repeat-x",
                       "repeat repeat-y",
                       "repeat-x repeat",
-                      "repeat-y repeat" ]
+                      "repeat-y repeat",
+                      "round round round",
+                      "repeat-x round",
+                      "round repeat-x",
+                      "repeat-y round",
+                      "round repeat-y",
+                      "space space space",
+                      "repeat-x space",
+                      "space repeat-x",
+                      "repeat-y space",
+                      "space repeat-y" ]
   },
   "background-size": {
     domProp: "backgroundSize",
@@ -4021,8 +4040,8 @@ var gCSSProperties = {
     invalid_values: [],
     quirks_values: { "5": "5px" },
   },
-  "word-wrap": {
-    domProp: "wordWrap",
+  "overflow-wrap": {
+    domProp: "overflowWrap",
     inherited: true,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "normal" ],
@@ -4579,6 +4598,13 @@ var gCSSProperties = {
   },
 
   // Aliases
+  "word-wrap": {
+    domProp: "wordWrap",
+    inherited: true,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "overflow-wrap",
+    subproperties: [ "overflow-wrap" ],
+  },
   "-moz-transform": {
     domProp: "MozTransform",
     inherited: false,
@@ -6436,16 +6462,18 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "0" ],
-    other_values: [ "2px", "1em", "calc(1px + 1em)" ],
-    invalid_values: [ "-1px", "2%", "auto", "none", "1px 1px", "calc(1%)" ],
+    other_values: [ "2px", "2%", "1em", "calc(1px + 1em)", "calc(1%)",
+                    "calc(1% + 1ch)" ],
+    invalid_values: [ "-1px", "auto", "none", "1px 1px", "-1%" ],
   };
   gCSSProperties["grid-row-gap"] = {
     domProp: "gridRowGap",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "0" ],
-    other_values: [ "2px", "1em", "calc(1px + 1em)" ],
-    invalid_values: [ "-1px", "2%", "auto", "none", "1px 1px", "calc(1%)" ],
+    other_values: [ "2px", "2%", "1em", "calc(1px + 1em)", "calc(1%)",
+                    "calc(1% + 1ch)" ],
+    invalid_values: [ "-1px", "auto", "none", "1px 1px", "-1%" ],
   };
   gCSSProperties["grid-gap"] = {
     domProp: "gridGap",
@@ -6453,9 +6481,9 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
     type: CSS_TYPE_TRUE_SHORTHAND,
     subproperties: [ "grid-column-gap", "grid-row-gap" ],
     initial_values: [ "0", "0 0" ],
-    other_values: [ "1ch 0", "1em 1px", "calc(1px + 1ch)" ],
+    other_values: [ "1ch 0", "1px 1%", "1em 1px", "calc(1px) calc(1%)" ],
     invalid_values: [ "-1px", "1px -1px", "1px 1px 1px", "inherit 1px",
-                      "1px 1%", "1px auto" ]
+                      "1px auto" ]
   };
 }
 
@@ -7375,6 +7403,90 @@ if (IsCSSPropertyPrefEnabled("layout.css.prefixes.webkit")) {
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
     alias_for: "-moz-box-pack",
     subproperties: [ "-moz-box-pack" ],
+  };
+  gCSSProperties["-webkit-flex-direction"] = {
+    domProp: "webkitFlexDirection",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "flex-direction",
+    subproperties: [ "flex-direction" ],
+  };
+  gCSSProperties["-webkit-flex-wrap"] = {
+    domProp: "webkitFlexWrap",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "flex-wrap",
+    subproperties: [ "flex-wrap" ],
+  };
+  gCSSProperties["-webkit-flex-flow"] = {
+    domProp: "webkitFlexFlow",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    alias_for: "flex-flow",
+    subproperties: [ "flex-direction", "flex-wrap" ],
+  };
+  gCSSProperties["-webkit-order"] = {
+    domProp: "webkitOrder",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "order",
+    subproperties: [ "order" ],
+  };
+  gCSSProperties["-webkit-flex"] = {
+    domProp: "webkitFlex",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    alias_for: "flex",
+    subproperties: [ "flex-grow", "flex-shrink", "flex-basis" ],
+  };
+  gCSSProperties["-webkit-flex-grow"] = {
+    domProp: "webkitFlexGrow",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "flex-grow",
+    subproperties: [ "flex-grow" ],
+  };
+  gCSSProperties["-webkit-flex-shrink"] = {
+    domProp: "webkitFlexShrink",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "flex-shrink",
+    subproperties: [ "flex-shrink" ],
+  };
+  gCSSProperties["-webkit-flex-basis"] = {
+    domProp: "webkitFlexBasis",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "flex-basis",
+    subproperties: [ "flex-basis" ],
+  };
+  gCSSProperties["-webkit-justify-content"] = {
+    domProp: "webkitJustifyContent",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "justify-content",
+    subproperties: [ "justify-content" ],
+  };
+  gCSSProperties["-webkit-align-items"] = {
+    domProp: "webkitAlignItems",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "align-items",
+    subproperties: [ "align-items" ],
+  };
+  gCSSProperties["-webkit-align-self"] = {
+    domProp: "webkitAlignSelf",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "align-self",
+    subproperties: [ "align-self" ],
+  };
+  gCSSProperties["-webkit-align-content"] = {
+    domProp: "webkitAlignContent",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "align-content",
+    subproperties: [ "align-content" ],
   };
   gCSSProperties["-webkit-user-select"] = {
     domProp: "webkitUserSelect",

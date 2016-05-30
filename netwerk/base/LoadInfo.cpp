@@ -24,6 +24,7 @@
 using namespace mozilla::dom;
 
 namespace mozilla {
+namespace net {
 
 static void
 InheritOriginAttributes(nsIPrincipal* aLoadingPrincipal, NeckoOriginAttributes& aAttrs)
@@ -464,6 +465,15 @@ LoadInfo::GetAllowChrome(bool* aResult)
 }
 
 NS_IMETHODIMP
+LoadInfo::GetDisallowScript(bool* aResult)
+{
+  *aResult =
+    (mSecurityFlags & nsILoadInfo::SEC_DISALLOW_SCRIPT);
+  return NS_OK;
+}
+
+
+NS_IMETHODIMP
 LoadInfo::GetDontFollowRedirects(bool* aResult)
 {
   *aResult =
@@ -725,4 +735,5 @@ LoadInfo::MaybeIncreaseTainting(uint32_t aTainting)
   return NS_OK;
 }
 
+} // namespace net
 } // namespace mozilla

@@ -124,6 +124,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public abstract class GeckoApp
     extends GeckoActivity
@@ -140,7 +141,7 @@ public abstract class GeckoApp
     ViewTreeObserver.OnGlobalLayoutListener {
 
     private static final String LOGTAG = "GeckoApp";
-    private static final int ONE_DAY_MS = 1000 * 60 * 60 * 24;
+    private static final long ONE_DAY_MS = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
 
     public static final String ACTION_ALERT_CALLBACK       = "org.mozilla.gecko.ACTION_ALERT_CALLBACK";
     public static final String ACTION_HOMESCREEN_SHORTCUT  = "org.mozilla.gecko.BOOKMARK";
@@ -1165,16 +1166,9 @@ public abstract class GeckoApp
             final String action = intent.getAction();
             final String args = intent.getStringExtra("args");
 
-            // If we don't already have a profile, but we do have arguments,
-            // let's see if they're enough to find one.
-            // Note that subclasses must ensure that if they try to access
-            // the profile prior to this code being run, then they do something
-            // similar.
-            final GeckoProfile profile = (args != null) ?
-                GeckoProfile.getFromArgs(getApplicationContext(), args) : null;
-
             sAlreadyLoaded = true;
-            GeckoThread.init(profile, args, action, /* debugging */ ACTION_DEBUG.equals(action));
+            GeckoThread.init(/* profile */ null, args, action,
+                             /* debugging */ ACTION_DEBUG.equals(action));
 
             // Speculatively pre-fetch the profile in the background.
             ThreadUtils.postToBackgroundThread(new Runnable() {

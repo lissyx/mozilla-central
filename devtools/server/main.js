@@ -400,6 +400,11 @@ var DebuggerServer = {
         type: { global: true }
       });
     }
+    this.registerModule("devtools/server/actors/addons", {
+      prefix: "addons",
+      constructor: "AddonsActor",
+      type: { global: true }
+    });
     this.registerModule("devtools/server/actors/webapps", {
       prefix: "webapps",
       constructor: "WebappsActor",
@@ -518,6 +523,11 @@ var DebuggerServer = {
     this.registerModule("devtools/server/actors/layout", {
       prefix: "reflow",
       constructor: "ReflowActor",
+      type: { tab: true }
+    });
+    this.registerModule("devtools/server/actors/css-properties", {
+      prefix: "cssProperties",
+      constructor: "CssPropertiesActor",
       type: { tab: true }
     });
     this.registerModule("devtools/server/actors/csscoverage", {

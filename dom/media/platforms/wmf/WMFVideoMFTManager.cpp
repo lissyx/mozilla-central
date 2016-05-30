@@ -30,8 +30,7 @@
 #include "MediaTelemetryConstants.h"
 #include "GMPUtils.h" // For SplitAt. TODO: Move SplitAt to a central place.
 
-extern mozilla::LogModule* GetPDMLog();
-#define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(sPDMLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 using mozilla::layers::Image;
 using mozilla::layers::IMFYCbCrImage;
@@ -806,17 +805,6 @@ WMFVideoMFTManager::IsHardwareAccelerated(nsACString& aFailureReason) const
 {
   aFailureReason = mDXVAFailureReason;
   return mDecoder && mUseHwAccel;
-}
-
-const char*
-WMFVideoMFTManager::GetDescriptionName() const
-{
-  if (mDecoder && mUseHwAccel && mDXVA2Manager) {
-    return (mDXVA2Manager->IsD3D11()) ?
-      "D3D11 Hardware Decoder" : "D3D9 Hardware Decoder";
-  } else {
-    return "wmf software video decoder";
-  }
 }
 
 void

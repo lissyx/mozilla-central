@@ -68,7 +68,9 @@
     "description": "Application reputation remote status (0=OK, 1=FAIL, 2=INVALID)"
   },
   "APPLICATION_REPUTATION_SERVER_VERDICT": {
-    "expires_in_version": "never",
+    "expires_in_version": "52",
+    "releaseChannelCollection": "opt-out",
+    "bug_numbers": [1272788],
     "kind": "enumerated",
     "n_values": 8,
     "description": "Application reputation remote response (0=SAFE, 1=DANGEROUS, 2=UNCOMMON, 3=POTENTIALLY_UNWANTED, 4=DANGEROUS_HOST)"
@@ -1053,10 +1055,13 @@
     "kind": "boolean",
     "description": "2D canvas used"
   },
-  "CANVAS_WEBGL_USED": {
+  "CANVAS_WEBGL_FAILURE_ID": {
+    "alert_emails": ["bgirard@mozilla.com"],
     "expires_in_version": "never",
-    "kind": "boolean",
-    "description": "WebGL canvas used"
+    "kind": "count",
+    "keyed": true,
+    "description": "WebGL runtime and dynamic failure IDs. This will record a count for each context creation success or failure. Each failure id is a unique identifier that can be traced back to a particular failure branch or blocklist rule.",
+    "bug_numbers": [1272808]
   },
   "CANVAS_WEBGL_SUCCESS": {
     "alert_emails": ["jmuizelaar@mozilla.com"],
@@ -1064,6 +1069,11 @@
     "kind": "boolean",
     "description": "WebGL1 creation success",
     "bug_numbers": [1247327]
+  },
+  "CANVAS_WEBGL_USED": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "WebGL canvas used"
   },
   "CANVAS_WEBGL2_SUCCESS": {
     "alert_emails": ["jmuizelaar@mozilla.com"],
@@ -2874,13 +2884,6 @@
     "kind": "boolean",
     "description": "The URL path contains !//"
   },
-  "NETWORK_SESSION_AT_256FD": {
-    "expires_in_version": "49",
-    "kind": "boolean",
-    "description": "session exceeded old 256 limit",
-    "bug_numbers": [1260218],
-    "alert_emails": ["necko@mozilla.com"]
-  },
   "NETWORK_SESSION_AT_900FD": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -3663,6 +3666,16 @@
     "n_buckets": 10,
     "cpp_guard": "ANDROID",
     "description": "Number of reading list items stored in the browser DB *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
+  },
+  "FENNEC_READER_VIEW_CACHE_SIZE": {
+    "expires_in_version": "60",
+    "alert_emails": ["mobile-frontend@mozilla.com"],
+    "kind": "exponential",
+    "low": 32,
+    "high": 51200,
+    "n_buckets": 20,
+    "description": "Total disk space used by items in the reader view cache (KB)",
+    "bug_numbers": [1246159]
   },
   "PLACES_SORTED_BOOKMARKS_PERC": {
     "expires_in_version": "never",
@@ -5505,6 +5518,15 @@
     "releaseChannelCollection": "opt-out",
     "description": "Record the search counts for search engines"
   },
+  "SEARCH_RESET_RESULT": {
+    "alert_emails": ["fqueze@mozilla.com"],
+    "bug_numbers": [1203168],
+    "expires_in_version": "53",
+    "kind": "enumerated",
+    "n_values": 5,
+    "releaseChannelCollection": "opt-out",
+    "description": "Result of showing the search reset prompt to the user. 0=restored original default, 1=kept current engine, 2=changed engine, 3=closed the page"
+  },
   "SEARCH_SERVICE_INIT_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -5517,6 +5539,16 @@
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "search service has been initialized synchronously"
+  },
+  "SEARCH_SERVICE_ENGINE_COUNT": {
+    "releaseChannelCollection": "opt-out",
+    "alert_emails": ["florian@mozilla.com"],
+    "expires_in_version": "55",
+    "bug_numbers": [1268424],
+    "kind": "linear",
+    "high": 200,
+    "n_buckets": 50,
+    "description": "Recorded once per session near startup: records the search plugin count, including both built-in plugins (including the ones the user has hidden) and user-installed plugins."
   },
   "SEARCH_SERVICE_HAS_UPDATES": {
     "alert_emails": ["florian@mozilla.com"],
@@ -8396,13 +8428,6 @@
     "n_values": 24,
     "description": "RSA signature key size for TLS_*_RSA_* in full handshake"
   },
-  "SSL_AUTH_DSA_KEY_SIZE_FULL": {
-    "alert_emails": ["seceng-telemetry@mozilla.com"],
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 24,
-    "description": "DSA signature key size for TLS_*_DSS_* in full handshake"
-  },
   "SSL_AUTH_ECDSA_CURVE_FULL": {
     "alert_emails": ["seceng-telemetry@mozilla.com"],
     "expires_in_version": "never",
@@ -9253,12 +9278,6 @@
     "high": 100,
     "n_buckets" : 10,
     "description": "The number of sites for which the user has explicitly rejected saving logins"
-  },
-  "PWMGR_FORM_ACTION_EFFECT": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values" : 5,
-    "description": "The effect of the form action on signon autofill. (0=No effect, 1=Fewer logins after considering the form action, 2=No logins match form origin and action."
   },
   "PWMGR_FORM_AUTOFILL_RESULT": {
     "expires_in_version": "never",
@@ -10655,16 +10674,6 @@
     "bug_numbers": [1238433],
     "description": "Percentage of frames decoded frames dropped in an HTMLVideoElement"
   },
-  "VIDEO_DETAILED_DROPPED_FRAMES_PROPORTION" : {
-    "alert_emails": ["lchristie@mozilla.com", "cpearce@mozilla.com"],
-    "expires_in_version": "55",
-    "kind": "linear",
-    "high": 100,
-    "n_buckets": 50,
-    "keyed": true,
-    "bug_numbers": [1238433],
-    "description": "Percentage of frames decoded frames dropped in an HTMLVideoElement, keyed by MimeType, Resolution and Hardware Accelerated Decoding"
-  },
   "TAB_SWITCH_CACHE_POSITION": {
     "expires_in_version": "55",
     "bug_numbers": [1242013],
@@ -10738,6 +10747,54 @@
     "expires_in_version": "55",
     "kind": "boolean",
     "description": "Result of call to SandboxBroker::Initialize"
+  },
+  "SANDBOX_CAPABILITIES_SECCOMP_BPF": {
+    "alert_emails": ["gcp@mozilla.com"],
+    "bug_numbers": [1098428],
+    "expires_in_version": "55",
+    "kind": "flag",
+    "cpp_guard": "XP_LINUX",
+    "description": "Whether the system has seccomp-bpf capability"
+  },
+  "SANDBOX_CAPABILITIES_SECCOMP_TSYNC": {
+    "alert_emails": ["gcp@mozilla.com"],
+    "bug_numbers": [1098428],
+    "expires_in_version": "55",
+    "kind": "flag",
+    "cpp_guard": "XP_LINUX",
+    "description": "Whether the system has seccomp-bpf thread-sync capability"
+  },
+  "SANDBOX_CAPABILITIES_USER_NAMESPACES": {
+    "alert_emails": ["gcp@mozilla.com"],
+    "bug_numbers": [1098428],
+    "expires_in_version": "55",
+    "kind": "flag",
+    "cpp_guard": "XP_LINUX",
+    "description": "Whether our process succedeed in creating a user namespace"
+  },
+  "SANDBOX_CAPABILITIES_USER_NAMESPACES_PRIVILEGED": {
+    "alert_emails": ["gcp@mozilla.com"],
+    "bug_numbers": [1098428],
+    "expires_in_version": "55",
+    "kind": "flag",
+    "cpp_guard": "XP_LINUX",
+    "description": "Whether the system has the capability to create privileged user namespaces"
+  },
+ "SANDBOX_CAPABILITIES_ENABLED_MEDIA": {
+    "alert_emails": ["gcp@mozilla.com"],
+    "bug_numbers": [1098428],
+    "expires_in_version": "55",
+    "kind": "flag",
+    "cpp_guard": "XP_LINUX",
+    "description": "Whether the sandbox is enabled for media/GMP plugins"
+  },
+ "SANDBOX_CAPABILITIES_ENABLED_CONTENT": {
+    "alert_emails": ["gcp@mozilla.com"],
+    "bug_numbers": [1098428],
+    "expires_in_version": "55",
+    "kind": "flag",
+    "cpp_guard": "XP_LINUX",
+    "description": "Whether the sandbox is enabled for the content process"
   },
   "SYNC_WORKER_OPERATION": {
     "alert_emails": ["amarchesini@mozilla.com", "khuey@mozilla.com" ],

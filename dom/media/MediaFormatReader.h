@@ -133,14 +133,21 @@ private:
                             MediaRawData* aSample);
 
   struct InternalSeekTarget {
-    InternalSeekTarget(const media::TimeUnit& aTime, bool aDropTarget)
+    InternalSeekTarget(const media::TimeInterval& aTime, bool aDropTarget)
       : mTime(aTime)
       , mDropTarget(aDropTarget)
       , mWaiting(false)
       , mHasSeeked(false)
     {}
 
-    media::TimeUnit mTime;
+    media::TimeUnit Time() const { return mTime.mStart; }
+    media::TimeUnit EndTime() const { return mTime.mEnd; }
+    bool Contains(const media::TimeUnit& aTime) const
+    {
+      return mTime.Contains(aTime);
+    }
+
+    media::TimeInterval mTime;
     bool mDropTarget;
     bool mWaiting;
     bool mHasSeeked;
@@ -236,8 +243,6 @@ private:
       , mNumSamplesOutput(0)
       , mNumSamplesOutputTotal(0)
       , mNumSamplesSkippedTotal(0)
-      , mNumSamplesOutputTotalSinceTelemetry(0)
-      , mNumSamplesSkippedTotalSinceTelemetry(0)
       , mSizeOfQueue(0)
       , mIsHardwareAccelerated(false)
       , mLastStreamSourceID(UINT32_MAX)
@@ -308,7 +313,7 @@ private:
     // encountering data discontinuity.
     Maybe<InternalSeekTarget> mTimeThreshold;
     // Time of last sample returned.
-    Maybe<media::TimeUnit> mLastSampleTime;
+    Maybe<media::TimeInterval> mLastSampleTime;
 
     // Decoded samples returned my mDecoder awaiting being returned to
     // state machine upon request.
@@ -317,9 +322,6 @@ private:
     uint64_t mNumSamplesOutput;
     uint64_t mNumSamplesOutputTotal;
     uint64_t mNumSamplesSkippedTotal;
-
-    uint64_t mNumSamplesOutputTotalSinceTelemetry;
-    uint64_t mNumSamplesSkippedTotalSinceTelemetry;
 
     // These get overridden in the templated concrete class.
     // Indicate if we have a pending promise for decoded frame.
@@ -367,7 +369,6 @@ private:
       MOZ_ASSERT(mOwner->OnTaskQueue());
       mDemuxEOS = false;
       mWaitingForData = false;
-      mReceivedNewData = false;
       mDiscontinuity = true;
       mQueuedSamples.Clear();
       mDecodingRequested = false;
@@ -479,6 +480,7 @@ private:
 
   void SkipVideoDemuxToNextKeyFrame(media::TimeUnit aTimeThreshold);
   MozPromiseRequestHolder<MediaTrackDemuxer::SkipAccessPointPromise> mSkipRequest;
+  void VideoSkipReset(uint32_t aSkipped);
   void OnVideoSkipCompleted(uint32_t aSkipped);
   void OnVideoSkipFailed(MediaTrackDemuxer::SkipFailureHolder aFailure);
 
@@ -531,9 +533,6 @@ private:
   {
     OnSeekFailed(TrackType::kAudioTrack, aFailure);
   }
-
-  void ReportDroppedFramesTelemetry();
-
   // The SeekTarget that was last given to Seek()
   SeekTarget mOriginalSeekTarget;
   // Temporary seek information while we wait for the data

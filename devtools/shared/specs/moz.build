@@ -5,9 +5,13 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 DevToolsModules(
+    'addons.js',
+    'animation.js',
+    'css-properties.js',
     'highlighters.js',
     'inspector.js',
     'storage.js',
+    'styleeditor.js',
     'styles.js',
     'stylesheets.js'
 )

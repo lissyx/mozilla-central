@@ -3307,11 +3307,12 @@ nsDocShell::SetDocLoaderParent(nsDocLoader* aParent)
     }
     SetAllowContentRetargeting(mAllowContentRetargeting &&
       parentAsDocShell->GetAllowContentRetargetingOnChildren());
-    if (NS_SUCCEEDED(parentAsDocShell->GetIsActive(&value))) {
-      SetIsActive(value);
-    }
     if (parentAsDocShell->GetIsPrerendered()) {
-      SetIsPrerendered(true);
+      SetIsPrerendered();
+    }
+    if (NS_SUCCEEDED(parentAsDocShell->GetIsActive(&value))) {
+      // a prerendered docshell is not active yet
+      SetIsActive(value && !mIsPrerendered);
     }
     if (NS_SUCCEEDED(parentAsDocShell->GetCustomUserAgent(customUserAgent)) &&
         !customUserAgent.IsEmpty()) {
@@ -5065,11 +5066,11 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
         break;
       case NS_ERROR_CORRUPTED_CONTENT:
         // Broken Content Detected. e.g. Content-MD5 check failure.
-        error.AssignLiteral("corruptedContentError");
+        error.AssignLiteral("corruptedContentErrorv2");
         break;
       case NS_ERROR_INTERCEPTION_FAILED:
         // ServiceWorker intercepted request, but something went wrong.
-        error.AssignLiteral("corruptedContentError");
+        error.AssignLiteral("corruptedContentErrorv2");
         break;
       case NS_ERROR_NET_INADEQUATE_SECURITY:
         // Server negotiated bad TLS for HTTP/2.
@@ -5595,7 +5596,7 @@ nsDocShell::InitWindow(nativeWindow aParentNativeWindow,
                        int32_t aWidth, int32_t aHeight)
 {
   SetParentWidget(aParentWidget);
-  SetPositionAndSize(aX, aY, aWidth, aHeight, false);
+  SetPositionAndSize(aX, aY, aWidth, aHeight, 0);
 
   return NS_OK;
 }
@@ -5841,7 +5842,8 @@ nsDocShell::SetSize(int32_t aWidth, int32_t aHeight, bool aRepaint)
 {
   int32_t x = 0, y = 0;
   GetPosition(&x, &y);
-  return SetPositionAndSize(x, y, aWidth, aHeight, aRepaint);
+  return SetPositionAndSize(x, y, aWidth, aHeight,
+                            aRepaint ? nsIBaseWindow::eRepaint : 0);
 }
 
 NS_IMETHODIMP
@@ -5852,7 +5854,7 @@ nsDocShell::GetSize(int32_t* aWidth, int32_t* aHeight)
 
 NS_IMETHODIMP
 nsDocShell::SetPositionAndSize(int32_t aX, int32_t aY, int32_t aWidth,
-                               int32_t aHeight, bool aFRepaint)
+                               int32_t aHeight, uint32_t aFlags)
 {
   mBounds.x = aX;
   mBounds.y = aY;
@@ -5862,8 +5864,11 @@ nsDocShell::SetPositionAndSize(int32_t aX, int32_t aY, int32_t aWidth,
   // Hold strong ref, since SetBounds can make us null out mContentViewer
   nsCOMPtr<nsIContentViewer> viewer = mContentViewer;
   if (viewer) {
+    uint32_t cvflags = (aFlags & nsIBaseWindow::eDelayResize) ?
+                           nsIContentViewer::eDelayResize : 0;
     // XXX Border figured in here or is that handled elsewhere?
-    NS_ENSURE_SUCCESS(viewer->SetBounds(mBounds), NS_ERROR_FAILURE);
+    nsresult rv = viewer->SetBoundsWithFlags(mBounds, cvflags);
+    NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
   }
 
   return NS_OK;
@@ -5877,7 +5882,7 @@ nsDocShell::GetPositionAndSize(int32_t* aX, int32_t* aY, int32_t* aWidth,
     // ensure size is up-to-date if window has changed resolution
     LayoutDeviceIntRect r;
     mParentWidget->GetClientBounds(r);
-    SetPositionAndSize(mBounds.x, mBounds.y, r.width, r.height, false);
+    SetPositionAndSize(mBounds.x, mBounds.y, r.width, r.height, 0);
   }
 
   // We should really consider just getting this information from
@@ -6092,6 +6097,9 @@ nsDocShell::SetIsActiveInternal(bool aIsActive, bool aIsHidden)
   // Keep track ourselves.
   mIsActive = aIsActive;
 
+  // Clear prerender flag if necessary.
+  mIsPrerendered &= !aIsActive;
+
   // Tell the PresShell about it.
   nsCOMPtr<nsIPresShell> pshell = GetPresShell();
   if (pshell) {
@@ -6157,11 +6165,12 @@ nsDocShell::GetIsActive(bool* aIsActive)
 }
 
 NS_IMETHODIMP
-nsDocShell::SetIsPrerendered(bool aPrerendered)
+nsDocShell::SetIsPrerendered()
 {
-  MOZ_ASSERT(!aPrerendered || !mIsPrerendered,
-             "SetIsPrerendered(true) called on already prerendered docshell");
-  mIsPrerendered = aPrerendered;
+  MOZ_ASSERT(!mIsPrerendered,
+             "SetIsPrerendered() called on already prerendered docshell");
+  SetIsActive(false);
+  mIsPrerendered = true;
   return NS_OK;
 }
 
@@ -7758,6 +7767,16 @@ nsDocShell::EndPageLoad(nsIWebProgress* aProgress,
             if (!sameURI) {
               // Keyword lookup made a new URI so no need to try
               // an alternate one.
+              doCreateAlternate = false;
+            }
+          }
+
+          if (doCreateAlternate) {
+            // Skip doing this if our channel was redirected, because we
+            // shouldn't be guessing things about the post-redirect URI.
+            nsLoadFlags loadFlags = 0;
+            if (NS_FAILED(aChannel->GetLoadFlags(&loadFlags)) ||
+                (loadFlags & nsIChannel::LOAD_REPLACE)) {
               doCreateAlternate = false;
             }
           }
@@ -13429,6 +13448,24 @@ nsDocShell::DoCommand(const char* aCommand)
   }
 
   return rv;
+}
+
+NS_IMETHODIMP
+nsDocShell::DoCommandWithParams(const char* aCommand, nsICommandParams* aParams)
+{
+  nsCOMPtr<nsIController> controller;
+  nsresult rv = GetControllerForCommand(aCommand, getter_AddRefs(controller));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  nsCOMPtr<nsICommandController> commandController =
+    do_QueryInterface(controller, &rv);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  return commandController->DoCommandWithParams(aCommand, aParams);
 }
 
 nsresult

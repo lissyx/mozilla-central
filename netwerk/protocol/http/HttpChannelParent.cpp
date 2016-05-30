@@ -392,12 +392,11 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
       NS_DeserializeObject(aSecurityInfoSerialization, getter_AddRefs(secInfo));
       mChannel->OverrideSecurityInfo(secInfo);
     }
-
   } else {
-    nsLoadFlags loadFlags;
-    mChannel->GetLoadFlags(&loadFlags);
-    loadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
-    mChannel->SetLoadFlags(loadFlags);
+    nsLoadFlags newLoadFlags;
+    mChannel->GetLoadFlags(&newLoadFlags);
+    newLoadFlags |= nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+    mChannel->SetLoadFlags(newLoadFlags);
   }
 
   nsCOMPtr<nsISupportsPRUint32> cacheKey =
@@ -1058,7 +1057,7 @@ HttpChannelParent::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
   }
 
   // !!! We need to lock headers and please don't forget to unlock them !!!
-  requestHead->Lock();
+  requestHead->Enter();
   nsresult rv = NS_OK;
   if (mIPCClosed ||
       !SendOnStartRequest(channelStatus,
@@ -1074,7 +1073,7 @@ HttpChannelParent::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
   {
     rv = NS_ERROR_UNEXPECTED;
   }
-  requestHead->Unlock();
+  requestHead->Exit();
   return rv;
 }
 

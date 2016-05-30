@@ -7,7 +7,6 @@
 #if !defined(PlatformDecoderModule_h_)
 #define PlatformDecoderModule_h_
 
-#include "FlushableTaskQueue.h"
 #include "MediaDecoderReader.h"
 #include "mozilla/MozPromise.h"
 #include "mozilla/layers/LayersTypes.h"
@@ -28,8 +27,10 @@ class ImageContainer;
 
 class MediaDataDecoder;
 class MediaDataDecoderCallback;
-class FlushableTaskQueue;
+class TaskQueue;
 class CDMProxy;
+
+static LazyLogModule sPDMLog("PlatformDecoderModule");
 
 // The PlatformDecoderModule interface is used by the MediaFormatReader to
 // abstract access to decoders provided by various
@@ -90,7 +91,7 @@ protected:
   CreateVideoDecoder(const VideoInfo& aConfig,
                      layers::LayersBackend aLayersBackend,
                      layers::ImageContainer* aImageContainer,
-                     FlushableTaskQueue* aVideoTaskQueue,
+                     TaskQueue* aTaskQueue,
                      MediaDataDecoderCallback* aCallback,
                      DecoderDoctorDiagnostics* aDiagnostics) = 0;
 
@@ -106,7 +107,7 @@ protected:
   // This is called on the decode task queue.
   virtual already_AddRefed<MediaDataDecoder>
   CreateAudioDecoder(const AudioInfo& aConfig,
-                     FlushableTaskQueue* aAudioTaskQueue,
+                     TaskQueue* aTaskQueue,
                      MediaDataDecoderCallback* aCallback,
                      DecoderDoctorDiagnostics* aDiagnostics) = 0;
 };

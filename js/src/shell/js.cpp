@@ -14,6 +14,7 @@
 #include "mozilla/mozalloc.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/SizePrintfMacros.h"
+#include "mozilla/TimeStamp.h"
 
 #ifdef XP_WIN
 # include <direct.h>
@@ -107,6 +108,8 @@ using mozilla::Maybe;
 using mozilla::NumberEqualsInt32;
 using mozilla::PodCopy;
 using mozilla::PodEqual;
+using mozilla::TimeDuration;
+using mozilla::TimeStamp;
 
 enum JSShellExitCode {
     EXITCODE_RUNTIME_ERROR      = 3,
@@ -131,7 +134,7 @@ static const size_t gMaxStackSize = 128 * sizeof(size_t) * 1024;
  * Limit the timeout to 30 minutes to prevent an overflow on platfoms
  * that represent the time internally in microseconds using 32-bit int.
  */
-static const double MAX_TIMEOUT_INTERVAL = 1800.0;
+static const double MAX_TIMEOUT_INTERVAL = 1800.0;  // seconds
 
 #ifdef NIGHTLY_BUILD
 # define SHARED_MEMORY_DEFAULT 1
@@ -156,6 +159,7 @@ struct ShellRuntime
     bool lastWarningEnabled;
     JS::PersistentRootedValue lastWarning;
 #ifdef SPIDERMONKEY_PROMISE
+    JS::PersistentRootedValue promiseRejectionTrackerCallback;
     JS::PersistentRooted<JobQueue> jobQueue;
 #endif // SPIDERMONKEY_PROMISE
 
@@ -308,6 +312,9 @@ ShellRuntime::ShellRuntime(JSRuntime* rt)
     interruptFunc(rt, NullValue()),
     lastWarningEnabled(false),
     lastWarning(rt, NullValue()),
+#ifdef SPIDERMONKEY_PROMISE
+    promiseRejectionTrackerCallback(rt, NullValue()),
+#endif // SPIDERMONKEY_PROMISE
     watchdogLock(nullptr),
     watchdogWakeup(nullptr),
     watchdogThread(nullptr),
@@ -629,16 +636,19 @@ RunModule(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
 
 #ifdef SPIDERMONKEY_PROMISE
 static bool
-ShellEnqueuePromiseJobCallback(JSContext* cx, JS::HandleObject job, void* data)
+ShellEnqueuePromiseJobCallback(JSContext* cx, JS::HandleObject job, JS::HandleObject allocationSite,
+                               void* data)
 {
     ShellRuntime* sr = GetShellRuntime(cx);
     MOZ_ASSERT(job);
     return sr->jobQueue.append(job);
 }
+#endif // SPIDERMONKEY_PROMISE
 
 static bool
 DrainJobQueue(JSContext* cx)
 {
+#ifdef SPIDERMONKEY_PROMISE
     ShellRuntime* sr = GetShellRuntime(cx);
     if (sr->quitting)
         return true;
@@ -656,6 +666,7 @@ DrainJobQueue(JSContext* cx)
         sr->jobQueue[i].set(nullptr);
     }
     sr->jobQueue.clear();
+#endif // SPIDERMONKEY_PROMISE
     return true;
 }
 
@@ -669,7 +680,48 @@ DrainJobQueue(JSContext* cx, unsigned argc, Value* vp)
     args.rval().setUndefined();
     return true;
 }
+
+#ifdef SPIDERMONKEY_PROMISE
+static void
+ForwardingPromiseRejectionTrackerCallback(JSContext* cx, JS::HandleObject promise,
+                                          PromiseRejectionHandlingState state, void* data)
+{
+    RootedValue callback(cx, GetShellRuntime(cx)->promiseRejectionTrackerCallback);
+    if (callback.isNull()) {
+        return;
+    }
+
+    FixedInvokeArgs<2> args(cx);
+    args[0].setObject(*promise);
+    args[1].setInt32(static_cast<int32_t>(state));
+
+    RootedValue rval(cx);
+    if (!Call(cx, callback, UndefinedHandleValue, args, &rval))
+        JS_ClearPendingException(cx);
+}
 #endif // SPIDERMONKEY_PROMISE
+
+static bool
+SetPromiseRejectionTrackerCallback(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+#ifdef SPIDERMONKEY_PROMISE
+    if (!IsCallable(args.get(0))) {
+        JS_ReportError(cx,
+                       "setPromiseRejectionTrackerCallback expects a function as its sole "
+                       "argument");
+        return false;
+    }
+
+    GetShellRuntime(cx)->promiseRejectionTrackerCallback = args[0];
+    JS::SetPromiseRejectionTrackerCallback(cx->runtime(),
+                                           ForwardingPromiseRejectionTrackerCallback);
+
+#endif // SPIDERMONKEY_PROMISE
+    args.rval().setUndefined();
+    return true;
+}
 
 static bool
 EvalAndPrint(JSContext* cx, const char* bytes, size_t length,
@@ -768,9 +820,7 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, bool compileOnly)
                   stderr);
         }
 
-#ifdef SPIDERMONKEY_PROMISE
         DrainJobQueue(cx);
-#endif // SPIDERMONKEY_PROMISE
 
     } while (!hitEOF && !sr->quitting);
 
@@ -923,7 +973,6 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-#ifdef SPIDERMONKEY_PROMISE
 static bool
 AddPromiseReactions(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -962,7 +1011,6 @@ AddPromiseReactions(JSContext* cx, unsigned argc, Value* vp)
 
     return JS::AddPromiseReactions(cx, promise, onResolve, onReject);
 }
-#endif // SPIDERMONKEY_PROMISE
 
 static bool
 Options(JSContext* cx, unsigned argc, Value* vp)
@@ -2000,7 +2048,7 @@ ValueToScript(JSContext* cx, Value vArg, JSFunction** funp = nullptr)
 static JSScript*
 GetTopScript(JSContext* cx)
 {
-    NonBuiltinScriptFrameIter iter(cx);
+    NonBuiltinScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
     return iter.done() ? nullptr : iter.script();
 }
 
@@ -3086,13 +3134,10 @@ Sleep_fn(JSContext* cx, unsigned argc, Value* vp)
 {
     ShellRuntime* sr = GetShellRuntime(cx);
     CallArgs args = CallArgsFromVp(argc, vp);
-    int64_t t_ticks;
 
-    if (args.length() == 0) {
-        t_ticks = 0;
-    } else {
+    TimeDuration duration = TimeDuration::FromSeconds(0.0);
+    if (args.length() > 0) {
         double t_secs;
-
         if (!ToNumber(cx, args[0], &t_secs))
             return false;
 
@@ -3101,20 +3146,18 @@ Sleep_fn(JSContext* cx, unsigned argc, Value* vp)
             JS_ReportError(cx, "Excessive sleep interval");
             return false;
         }
-        t_ticks = (t_secs <= 0.0)
-                  ? 0
-                  : int64_t(PRMJ_USEC_PER_SEC * t_secs);
+        duration = TimeDuration::FromSeconds(Max(0.0, t_secs));
     }
     PR_Lock(sr->watchdogLock);
-    int64_t to_wakeup = PRMJ_Now() + t_ticks;
+    TimeStamp toWakeup = TimeStamp::Now() + duration;
     for (;;) {
-        PR_WaitCondVar(sr->sleepWakeup, PR_MillisecondsToInterval(t_ticks / 1000));
+        PR_WaitCondVar(sr->sleepWakeup, DurationToPRInterval(duration));
         if (sr->serviceInterrupt)
             break;
-        int64_t now = PRMJ_Now();
-        if (!IsBefore(now, to_wakeup))
+        auto now = TimeStamp::Now();
+        if (now >= toWakeup)
             break;
-        t_ticks = to_wakeup - now;
+        duration = toWakeup - now;
     }
     PR_Unlock(sr->watchdogLock);
     args.rval().setUndefined();
@@ -3196,11 +3239,11 @@ WatchdogMain(void* arg)
                 JS_RequestInterruptCallback(rt);
             }
 
-            uint64_t sleepDuration = PR_INTERVAL_NO_TIMEOUT;
-            if (sr->watchdogHasTimeout)
-                sleepDuration = PR_TicksPerSecond() / 10;
+            TimeDuration sleepDuration = sr->watchdogHasTimeout
+                                         ? TimeDuration::FromSeconds(0.1)
+                                         : TimeDuration::Forever();
             mozilla::DebugOnly<PRStatus> status =
-              PR_WaitCondVar(sr->watchdogWakeup, sleepDuration);
+              PR_WaitCondVar(sr->watchdogWakeup, DurationToPRInterval(sleepDuration));
             MOZ_ASSERT(status == PR_SUCCESS);
         }
     }
@@ -4252,7 +4295,7 @@ DecompileThisScript(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    NonBuiltinScriptFrameIter iter(cx);
+    NonBuiltinScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
     if (iter.done()) {
         args.rval().setString(cx->runtime()->emptyString);
         return true;
@@ -5547,11 +5590,9 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
 "createMappedArrayBuffer(filename, [offset, [size]])",
 "  Create an array buffer that mmaps the given file."),
 
-#ifdef SPIDERMONKEY_PROMISE
     JS_FN_HELP("addPromiseReactions", AddPromiseReactions, 3, 0,
 "addPromiseReactions(promise, onResolve, onReject)",
 "  Calls the JS::AddPromiseReactions JSAPI function with the given arguments."),
-#endif // SPIDERMONKEY_PROMISE
 
     JS_FN_HELP("getMaxArgs", GetMaxArgs, 0, 0,
 "getMaxArgs()",
@@ -5626,12 +5667,15 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
 "string 'eval:FILENAME' if the code was invoked by 'eval' or something\n"
 "similar.\n"),
 
-#ifdef SPIDERMONKEY_PROMISE
     JS_FN_HELP("drainJobQueue", DrainJobQueue, 0, 0,
 "drainJobQueue()",
 "Take jobs from the shell's job queue in FIFO order and run them until the\n"
 "queue is empty.\n"),
-#endif // SPIDERMONKEY_PROMISE
+
+    JS_FN_HELP("setPromiseRejectionTrackerCallback", SetPromiseRejectionTrackerCallback, 1, 0,
+"setPromiseRejectionTrackerCallback()",
+"Sets the callback to be invoked whenever a Promise rejection is unhandled\n"
+"or a previously-unhandled rejection becomes handled."),
 
     JS_FS_HELP_END
 };
@@ -6742,9 +6786,7 @@ ProcessArgs(JSContext* cx, OptionParser* op)
             return sr->exitCode;
     }
 
-#ifdef SPIDERMONKEY_PROMISE
     DrainJobQueue(cx);
-#endif // SPIDERMONKEY_PROMISE
 
     if (op->getBoolOption('i'))
         Process(cx, nullptr, true);

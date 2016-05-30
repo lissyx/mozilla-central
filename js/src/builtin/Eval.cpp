@@ -293,13 +293,19 @@ EvalKernel(JSContext* cx, HandleValue v, EvalType evalType, AbstractFramePtr cal
             return false;
 
         CompileOptions options(cx);
-        options.setFileAndLine(filename, 1)
-               .setIsRunOnce(true)
+        options.setIsRunOnce(true)
                .setForEval(true)
                .setNoScriptRval(false)
                .setMutedErrors(mutedErrors)
-               .setIntroductionInfo(introducerFilename, "eval", lineno, maybeScript, pcOffset)
                .maybeMakeStrictMode(evalType == DIRECT_EVAL && IsStrictEvalPC(pc));
+
+        if (introducerFilename) {
+            options.setFileAndLine(filename, 1);
+            options.setIntroductionInfo(introducerFilename, "eval", lineno, maybeScript, pcOffset);
+        } else {
+            options.setFileAndLine("eval", 1);
+            options.setIntroductionType("eval");
+        }
 
         AutoStableStringChars linearChars(cx);
         if (!linearChars.initTwoByte(cx, linearStr))
@@ -375,13 +381,19 @@ js::DirectEvalStringFromIon(JSContext* cx,
             return false;
 
         CompileOptions options(cx);
-        options.setFileAndLine(filename, 1)
-               .setIsRunOnce(true)
+        options.setIsRunOnce(true)
                .setForEval(true)
                .setNoScriptRval(false)
                .setMutedErrors(mutedErrors)
-               .setIntroductionInfo(introducerFilename, "eval", lineno, maybeScript, pcOffset)
                .maybeMakeStrictMode(IsStrictEvalPC(pc));
+
+        if (introducerFilename) {
+            options.setFileAndLine(filename, 1);
+            options.setIntroductionInfo(introducerFilename, "eval", lineno, maybeScript, pcOffset);
+        } else {
+            options.setFileAndLine("eval", 1);
+            options.setIntroductionType("eval");
+        }
 
         AutoStableStringChars linearChars(cx);
         if (!linearChars.initTwoByte(cx, linearStr))
@@ -426,7 +438,7 @@ bool
 js::DirectEval(JSContext* cx, HandleValue v, MutableHandleValue vp)
 {
     // Direct eval can assume it was called from an interpreted or baseline frame.
-    ScriptFrameIter iter(cx);
+    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
     AbstractFramePtr caller = iter.abstractFramePtr();
 
     MOZ_ASSERT(JSOp(*iter.pc()) == JSOP_EVAL ||

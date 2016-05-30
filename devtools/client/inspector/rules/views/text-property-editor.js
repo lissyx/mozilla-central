@@ -4,8 +4,9 @@
 
 "use strict";
 
-const {Cc, Ci} = require("chrome");
+const {Ci} = require("chrome");
 const {CssLogic} = require("devtools/shared/inspector/css-logic");
+const {getCssProperties} = require("devtools/shared/fronts/css-properties");
 const {InplaceEditor, editableField} =
       require("devtools/client/shared/inplace-editor");
 const {
@@ -18,11 +19,9 @@ const {
 const {
   parseDeclarations,
   parseSingleValue,
-} = require("devtools/client/shared/css-parsing-utils");
+} = require("devtools/shared/css-parsing-utils");
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
-const IOService = Cc["@mozilla.org/network/io-service;1"]
-                  .getService(Ci.nsIIOService);
 
 /**
  * TextPropertyEditor is responsible for the following:
@@ -45,6 +44,9 @@ function TextPropertyEditor(ruleEditor, property) {
   this.prop.editor = this;
   this.browserWindow = this.doc.defaultView.top;
   this._populatedComputed = false;
+
+  const toolbox = this.ruleView.inspector.toolbox;
+  this.cssProperties = getCssProperties(toolbox);
 
   this._onEnableClicked = this._onEnableClicked.bind(this);
   this._onExpandClicked = this._onExpandClicked.bind(this);
@@ -201,7 +203,7 @@ TextPropertyEditor.prototype = {
 
       // Auto blur name field on multiple CSS rules get pasted in.
       this.nameContainer.addEventListener("paste",
-        blurOnMultipleProperties, false);
+        blurOnMultipleProperties(this.cssProperties), false);
 
       this.valueContainer.addEventListener("click", (event) => {
         // Clicks within the value shouldn't propagate any further.
@@ -251,38 +253,6 @@ TextPropertyEditor.prototype = {
       return domRule.href || domRule.nodeHref;
     }
     return undefined;
-  },
-
-  /**
-   * Get the URI from which to resolve relative requests for
-   * this rule's stylesheet.
-   *
-   * @return {nsIURI} A URI based on the the stylesheet's href.
-   */
-  get sheetURI() {
-    if (this._sheetURI === undefined) {
-      if (this.sheetHref) {
-        this._sheetURI = IOService.newURI(this.sheetHref, null, null);
-      } else {
-        this._sheetURI = null;
-      }
-    }
-
-    return this._sheetURI;
-  },
-
-  /**
-   * Resolve a URI based on the rule stylesheet
-   *
-   * @param {String} relativePath
-   *        the path to resolve
-   * @return {String} the resolved path.
-   */
-  resolveURI: function (relativePath) {
-    if (this.sheetURI) {
-      relativePath = this.sheetURI.resolve(relativePath);
-    }
-    return relativePath;
   },
 
   /**
@@ -353,7 +323,7 @@ TextPropertyEditor.prototype = {
       angleClass: "ruleview-angle",
       defaultColorType: !propDirty,
       urlClass: "theme-link",
-      baseURI: this.sheetURI
+      baseURI: this.sheetHref
     };
     let frag = outputParser.parseCssProperty(name, val, parserOptions);
     this.valueSpan.innerHTML = "";
@@ -478,7 +448,7 @@ TextPropertyEditor.prototype = {
         computed.name, computed.value, {
           colorSwatchClass: "ruleview-swatch ruleview-colorswatch",
           urlClass: "theme-link",
-          baseURI: this.sheetURI
+          baseURI: this.sheetHref
         }
       );
 
@@ -593,7 +563,7 @@ TextPropertyEditor.prototype = {
 
     // Adding multiple rules inside of name field overwrites the current
     // property with the first, then adds any more onto the property list.
-    let properties = parseDeclarations(value);
+    let properties = parseDeclarations(this.cssProperties.isKnown, value);
 
     if (properties.length) {
       this.prop.setName(properties[0].name);
@@ -652,7 +622,8 @@ TextPropertyEditor.prototype = {
    */
   _onValueDone: function (value = "", commit, direction) {
     let parsedProperties = this._getValueAndExtraProperties(value);
-    let val = parseSingleValue(parsedProperties.firstValue);
+    let val = parseSingleValue(this.cssProperties.isKnown,
+                               parsedProperties.firstValue);
     let isValueUnchanged = (!commit && !this.ruleEditor.isEditing) ||
                            !parsedProperties.propertiesToAdd.length &&
                            this.committed.value === val.value &&
@@ -740,7 +711,7 @@ TextPropertyEditor.prototype = {
     let firstValue = value;
     let propertiesToAdd = [];
 
-    let properties = parseDeclarations(value);
+    let properties = parseDeclarations(this.cssProperties.isKnown, value);
 
     // Check to see if the input string can be parsed as multiple properties
     if (properties.length) {
@@ -779,7 +750,7 @@ TextPropertyEditor.prototype = {
       return;
     }
 
-    let val = parseSingleValue(value);
+    let val = parseSingleValue(this.cssProperties.isKnown, value);
     this.ruleEditor.rule.previewPropertyValue(this.prop, val.value,
                                               val.priority);
   },

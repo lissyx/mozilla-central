@@ -73,6 +73,39 @@ CreateRadiobuttonWidget()
 }
 
 static GtkWidget*
+CreateMenuBarWidget()
+{
+  GtkWidget* widget = gtk_menu_bar_new();
+  AddToWindowContainer(widget);
+  return widget;
+}
+
+static GtkWidget*
+CreateMenuPopupWidget()
+{
+  GtkWidget* widget = gtk_menu_new();
+  gtk_menu_attach_to_widget(GTK_MENU(widget), GetWidget(MOZ_GTK_WINDOW),
+                            nullptr);
+  return widget;
+}
+
+static GtkWidget*
+CreateMenuItemWidget(WidgetNodeType aShellType)
+{
+  GtkWidget* widget = gtk_menu_item_new();
+  gtk_menu_shell_append(GTK_MENU_SHELL(GetWidget(aShellType)), widget);
+  return widget;
+}
+
+static GtkWidget*
+CreateProgressWidget()
+{
+  GtkWidget* widget = gtk_progress_bar_new();
+  AddToWindowContainer(widget);
+  return widget;
+}
+
+static GtkWidget*
 CreateWidget(WidgetNodeType aWidgetType)
 {
   switch (aWidgetType) {
@@ -80,16 +113,26 @@ CreateWidget(WidgetNodeType aWidgetType)
       return CreateWindowWidget();
     case MOZ_GTK_WINDOW_CONTAINER:
       return CreateWindowContainerWidget();
+    case MOZ_GTK_CHECKBUTTON_CONTAINER:
+      return CreateCheckboxWidget();
+    case MOZ_GTK_PROGRESSBAR:
+      return CreateProgressWidget();
+    case MOZ_GTK_RADIOBUTTON_CONTAINER:
+      return CreateRadiobuttonWidget();
     case MOZ_GTK_SCROLLBAR_HORIZONTAL:
       return CreateScrollbarWidget(aWidgetType,
                                    GTK_ORIENTATION_HORIZONTAL);
     case MOZ_GTK_SCROLLBAR_VERTICAL:
       return CreateScrollbarWidget(aWidgetType,
                                    GTK_ORIENTATION_VERTICAL);
-    case MOZ_GTK_CHECKBUTTON_CONTAINER:
-      return CreateCheckboxWidget();
-    case MOZ_GTK_RADIOBUTTON_CONTAINER:
-      return CreateRadiobuttonWidget();
+    case MOZ_GTK_MENUBAR:
+      return CreateMenuBarWidget();
+    case MOZ_GTK_MENUPOPUP:
+      return CreateMenuPopupWidget();
+    case MOZ_GTK_MENUBARITEM:
+      return CreateMenuItemWidget(MOZ_GTK_MENUBAR);
+    case MOZ_GTK_MENUITEM:
+      return CreateMenuItemWidget(MOZ_GTK_MENUPOPUP);
     default:
       /* Not implemented */
       return nullptr;
@@ -208,6 +251,22 @@ GetStyleInternal(WidgetNodeType aNodeType)
                                MOZ_GTK_CHECKBUTTON_CONTAINER,
                                GTK_STYLE_CLASS_CHECK,
                                MOZ_GTK_CHECKBUTTON_CONTAINER);
+
+    case MOZ_GTK_PROGRESSBAR:
+      /* Root CSS node / widget for progress bars */
+      break;
+    case MOZ_GTK_PROGRESS_TROUGH:
+      /* Progress bar background (trough) */
+      return GetChildNodeStyle(aNodeType,
+                               MOZ_GTK_PROGRESSBAR,
+                               GTK_STYLE_CLASS_TROUGH,
+                               MOZ_GTK_PROGRESSBAR);
+    case MOZ_GTK_PROGRESS_CHUNK:
+      /* Actual progress bar indicator for Gtk3.20+ only. */
+      return GetChildNodeStyle(MOZ_GTK_PROGRESS_CHUNK,
+                               MOZ_GTK_PROGRESSBAR,
+                               "progress",
+                               MOZ_GTK_PROGRESS_TROUGH);
     default:
       break;
   }
@@ -247,13 +306,32 @@ GtkStyleContext*
 ClaimStyleContext(WidgetNodeType aNodeType, GtkTextDirection aDirection,
                   GtkStateFlags aStateFlags, StyleFlags aFlags)
 {
+  MOZ_ASSERT(!sStyleContextNeedsRestore);
   GtkStyleContext* style = GetStyleInternal(aNodeType);
 #ifdef DEBUG
   MOZ_ASSERT(!sCurrentStyleContext);
   sCurrentStyleContext = style;
 #endif
-  gtk_style_context_set_state(style, aStateFlags);
-  gtk_style_context_set_direction(style, aDirection);
+  GtkStateFlags oldState = gtk_style_context_get_state(style);
+  GtkTextDirection oldDirection = gtk_style_context_get_direction(style);
+  if (oldState != aStateFlags || oldDirection != aDirection) {
+    // From GTK 3.8, set_state() will overwrite the direction, so set
+    // direction after state.
+    gtk_style_context_set_state(style, aStateFlags);
+    gtk_style_context_set_direction(style, aDirection);
+
+    // This invalidate is necessary for unsaved style contexts from GtkWidgets
+    // in pre-3.18 GTK, because automatic invalidation of such contexts
+    // was delayed until a resize event runs.
+    //
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=1272194#c7
+    //
+    // Avoid calling invalidate on saved contexts to avoid performing
+    // build_properties() (in 3.16 stylecontext.c) unnecessarily early.
+    if (!sStyleContextNeedsRestore) {
+      gtk_style_context_invalidate(style);
+    }
+  }
   return style;
 }
 
