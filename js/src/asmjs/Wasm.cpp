@@ -289,21 +289,17 @@ DecodeExpr(FunctionDecoder& f)
       case Expr::F32Ceil:
       case Expr::F32Floor:
       case Expr::F32Sqrt:
-        return f.iter().readUnary(ValType::F32, nullptr);
       case Expr::F32Trunc:
-        return f.iter().notYetImplemented("trunc");
       case Expr::F32Nearest:
-        return f.iter().notYetImplemented("nearest");
+        return f.iter().readUnary(ValType::F32, nullptr);
       case Expr::F64Abs:
       case Expr::F64Neg:
       case Expr::F64Ceil:
       case Expr::F64Floor:
       case Expr::F64Sqrt:
-        return f.iter().readUnary(ValType::F64, nullptr);
       case Expr::F64Trunc:
-        return f.iter().notYetImplemented("trunc");
       case Expr::F64Nearest:
-        return f.iter().notYetImplemented("nearest");
+        return f.iter().readUnary(ValType::F64, nullptr);
       case Expr::I32Add:
       case Expr::I32Sub:
       case Expr::I32Mul:
@@ -343,18 +339,16 @@ DecodeExpr(FunctionDecoder& f)
       case Expr::F32Div:
       case Expr::F32Min:
       case Expr::F32Max:
-        return f.iter().readBinary(ValType::F32, nullptr, nullptr);
       case Expr::F32CopySign:
-        return f.iter().notYetImplemented("copysign");
+        return f.iter().readBinary(ValType::F32, nullptr, nullptr);
       case Expr::F64Add:
       case Expr::F64Sub:
       case Expr::F64Mul:
       case Expr::F64Div:
       case Expr::F64Min:
       case Expr::F64Max:
-        return f.iter().readBinary(ValType::F64, nullptr, nullptr);
       case Expr::F64CopySign:
-        return f.iter().notYetImplemented("copysign");
+        return f.iter().readBinary(ValType::F64, nullptr, nullptr);
       case Expr::I32Eq:
       case Expr::I32Ne:
       case Expr::I32LtS:
@@ -525,8 +519,6 @@ DecodeTypeSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
 
     if (!init->sigs.resize(numSigs))
         return false;
-    if (!init->sigToTable.resize(numSigs))
-        return false;
 
     for (uint32_t sigIndex = 0; sigIndex < numSigs; sigIndex++) {
         uint32_t form;
@@ -635,17 +627,16 @@ DecodeTableSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
     if (sectionStart == Decoder::NotStarted)
         return true;
 
-    if (!d.readVarU32(&init->numTableElems))
+    if (!d.readVarU32(&init->wasmTable.numElems))
         return Fail(cx, d, "expected number of table elems");
 
-    if (init->numTableElems > MaxTableElems)
+    if (init->wasmTable.numElems > MaxTableElems)
         return Fail(cx, d, "too many table elements");
 
-    Uint32Vector elems;
-    if (!elems.resize(init->numTableElems))
+    if (!init->wasmTable.elemFuncIndices.resize(init->wasmTable.numElems))
         return false;
 
-    for (uint32_t i = 0; i < init->numTableElems; i++) {
+    for (uint32_t i = 0; i < init->wasmTable.numElems; i++) {
         uint32_t funcIndex;
         if (!d.readVarU32(&funcIndex))
             return Fail(cx, d, "expected table element");
@@ -653,34 +644,11 @@ DecodeTableSection(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
         if (funcIndex >= init->funcSigs.length())
             return Fail(cx, d, "table element out of range");
 
-        elems[i] = funcIndex;
+        init->wasmTable.elemFuncIndices[i] = funcIndex;
     }
 
     if (!d.finishSection(sectionStart, sectionSize))
         return Fail(cx, d, "table section byte size mismatch");
-
-    // Convert the single (heterogeneous) indirect function table into an
-    // internal set of asm.js-like homogeneous tables indexed by signature.
-    // Every element in the heterogeneous table is present in only one
-    // homogeneous table (as determined by its signature). An element's index in
-    // the heterogeneous table is the same as its index in its homogeneous table
-    // and all other homogeneous tables are given an entry that will fault if
-    // called for at that element's index.
-
-    for (uint32_t elemIndex = 0; elemIndex < elems.length(); elemIndex++) {
-        uint32_t funcIndex = elems[elemIndex];
-        TableModuleGeneratorData& table = init->sigToTable[init->funcSigIndex(funcIndex)];
-        if (table.numElems == 0) {
-            table.numElems = elems.length();
-            if (!table.elemFuncIndices.appendN(ModuleGenerator::BadIndirectCall, elems.length()))
-                return false;
-        }
-    }
-
-    for (uint32_t elemIndex = 0; elemIndex < elems.length(); elemIndex++) {
-        uint32_t funcIndex = elems[elemIndex];
-        init->sigToTable[init->funcSigIndex(funcIndex)].elemFuncIndices[elemIndex] = funcIndex;
-    }
 
     return true;
 }

@@ -42,6 +42,7 @@ const STATISTICS_URL = EXAMPLE_URL + "html_statistics-test-page.html";
 const CURL_URL = EXAMPLE_URL + "html_copy-as-curl.html";
 const CURL_UTILS_URL = EXAMPLE_URL + "html_curl-utils.html";
 const SEND_BEACON_URL = EXAMPLE_URL + "html_send-beacon.html";
+const CORS_URL = EXAMPLE_URL + "html_cors-test-page.html";
 
 const SIMPLE_SJS = EXAMPLE_URL + "sjs_simple-test-server.sjs";
 const CONTENT_TYPE_SJS = EXAMPLE_URL + "sjs_content-type-test-server.sjs";
@@ -253,7 +254,8 @@ function waitForNetworkEvents(aMonitor, aGetRequests, aPostRequests = 0) {
     let url = networkInfo.request.url;
     updateProgressForURL(url, event);
 
-    info("> Current state: " + JSON.stringify(progress, null, 2));
+    // Uncomment this to get a detailed progress logging (when debugging a test)
+    // info("> Current state: " + JSON.stringify(progress, null, 2));
 
     // There are 15 updates which need to be fired for a request to be
     // considered finished. The "requestPostData" packet isn't fired for

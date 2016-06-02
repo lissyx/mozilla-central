@@ -4137,6 +4137,37 @@ class CGCallbackTempRoot(CGGeneric):
         CGGeneric.__init__(self, define=define)
 
 
+def getCallbackConversionInfo(type, idlObject, isMember, isCallbackReturnValue,
+                              isOptional):
+    """
+    Returns a tuple containing the declType, declArgs, and basic
+    conversion for the given callback type, with the given callback
+    idl object in the given context (isMember/isCallbackReturnValue/isOptional).
+    """
+    name = idlObject.identifier.name
+
+    # We can't use fast callbacks if isOptional because then we get an
+    # Optional<RootedCallback> thing, which is not transparent to consumers.
+    useFastCallback = (not isMember and not isCallbackReturnValue and
+                       not isOptional)
+    if useFastCallback:
+        name = "binding_detail::Fast%s" % name
+
+    if type.nullable() or isCallbackReturnValue:
+        declType = CGGeneric("RefPtr<%s>" % name)
+    else:
+        declType = CGGeneric("OwningNonNull<%s>" % name)
+
+    if useFastCallback:
+        declType = CGTemplatedType("RootedCallback", declType)
+        declArgs = "cx"
+    else:
+        declArgs = None
+
+    conversion = indent(CGCallbackTempRoot(name).define())
+    return (declType, declArgs, conversion)
+
+
 class JSToNativeConversionInfo():
     """
     An object representing information about a JS-to-native conversion.
@@ -5039,17 +5070,16 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
         assert descriptor.nativeType != 'JSObject'
 
         if descriptor.interface.isCallback():
-            name = descriptor.interface.identifier.name
-            if type.nullable() or isCallbackReturnValue:
-                declType = CGGeneric("RefPtr<%s>" % name)
-            else:
-                declType = CGGeneric("OwningNonNull<%s>" % name)
-            conversion = indent(CGCallbackTempRoot(name).define())
-
+            (declType, declArgs,
+             conversion) = getCallbackConversionInfo(type, descriptor.interface,
+                                                     isMember,
+                                                     isCallbackReturnValue,
+                                                     isOptional)
             template = wrapObjectTemplate(conversion, type,
                                           "${declName} = nullptr;\n",
                                           failureCode)
             return JSToNativeConversionInfo(template, declType=declType,
+                                            declArgs=declArgs,
                                             dealWithOptional=isOptional)
 
         # This is an interface that we implement as a concrete class
@@ -5529,11 +5559,10 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
 
         callback = type.unroll().callback
         name = callback.identifier.name
-        if type.nullable():
-            declType = CGGeneric("RefPtr<%s>" % name)
-        else:
-            declType = CGGeneric("OwningNonNull<%s>" % name)
-        conversion = indent(CGCallbackTempRoot(name).define())
+        (declType, declArgs,
+         conversion) = getCallbackConversionInfo(type, callback, isMember,
+                                                 isCallbackReturnValue,
+                                                 isOptional)
 
         if allowTreatNonCallableAsNull and type.treatNonCallableAsNull():
             haveCallable = "JS::IsCallable(&${val}.toObject())"
@@ -5570,6 +5599,7 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
                 "${declName} = nullptr;\n",
                 failureCode)
         return JSToNativeConversionInfo(template, declType=declType,
+                                        declArgs=declArgs,
                                         dealWithOptional=isOptional)
 
     if type.isAny():
@@ -13476,8 +13506,14 @@ class CGBindingRoot(CGThing):
         cgthings.extend(CGCallbackFunction(c, config.getDescriptorProvider(False))
                         for c in mainCallbacks)
 
+        cgthings.extend([CGNamespace('binding_detail', CGFastCallback(c))
+                         for c in mainCallbacks])
+
         cgthings.extend(CGCallbackFunction(c, config.getDescriptorProvider(True))
                         for c in workerCallbacks if c not in mainCallbacks)
+
+        cgthings.extend([CGNamespace('binding_detail', CGFastCallback(c))
+                         for c in workerCallbacks if c not in mainCallbacks])
 
         # Do codegen for all the descriptors
         cgthings.extend([CGDescriptor(x) for x in descriptors])
@@ -13485,6 +13521,10 @@ class CGBindingRoot(CGThing):
         # Do codegen for all the callback interfaces.  Skip worker callbacks.
         cgthings.extend([CGCallbackInterface(x) for x in callbackDescriptors if
                          not x.workers])
+
+        cgthings.extend([CGNamespace('binding_detail',
+                                     CGFastCallback(x.interface))
+                         for x in callbackDescriptors if not x.workers])
 
         # Do codegen for JS implemented classes
         def getParentDescriptor(desc):
@@ -13556,7 +13596,9 @@ class CGNativeMember(ClassMethod):
     def __init__(self, descriptorProvider, member, name, signature, extendedAttrs,
                  breakAfter=True, passJSBitsAsNeeded=True, visibility="public",
                  typedArraysAreStructs=True, variadicIsSequence=False,
-                 resultNotAddRefed=False):
+                 resultNotAddRefed=False,
+                 virtual=False,
+                 override=False):
         """
         If typedArraysAreStructs is false, typed arrays will be passed as
         JS::Handle<JSObject*>.  If it's true they will be passed as one of the
@@ -13584,7 +13626,9 @@ class CGNativeMember(ClassMethod):
                                     not signature[0].isVoid()),
                              breakAfterReturnDecl=" ",
                              breakAfterSelf=breakAfterSelf,
-                             visibility=visibility)
+                             visibility=visibility,
+                             virtual=virtual,
+                             override=override)
 
     def getReturnType(self, type, isMember):
         return self.getRetvalInfo(type, isMember)[0]
@@ -14348,12 +14392,15 @@ class CGJSImplMember(CGNativeMember):
     """
     def __init__(self, descriptorProvider, member, name, signature,
                  extendedAttrs, breakAfter=True, passJSBitsAsNeeded=True,
-                 visibility="public", variadicIsSequence=False):
+                 visibility="public", variadicIsSequence=False,
+                 virtual=False, override=False):
         CGNativeMember.__init__(self, descriptorProvider, member, name,
                                 signature, extendedAttrs, breakAfter=breakAfter,
                                 passJSBitsAsNeeded=passJSBitsAsNeeded,
                                 visibility=visibility,
-                                variadicIsSequence=variadicIsSequence)
+                                variadicIsSequence=variadicIsSequence,
+                                virtual=virtual,
+                                override=override)
         self.body = self.getImpl()
 
     def getArgs(self, returnType, argList):
@@ -14368,6 +14415,13 @@ class CGJSImplMethod(CGJSImplMember):
     interface.
     """
     def __init__(self, descriptor, method, signature, isConstructor, breakAfter=True):
+        virtual = False
+        override = False
+        if (method.identifier.name == "eventListenerWasAdded" or
+            method.identifier.name == "eventListenerWasRemoved"):
+            virtual = True
+            override = True
+
         self.signature = signature
         self.descriptor = descriptor
         self.isConstructor = isConstructor
@@ -14378,7 +14432,9 @@ class CGJSImplMethod(CGJSImplMember):
                                 descriptor.getExtendedAttributes(method),
                                 breakAfter=breakAfter,
                                 variadicIsSequence=True,
-                                passJSBitsAsNeeded=False)
+                                passJSBitsAsNeeded=False,
+                                virtual=virtual,
+                                override=override)
 
     def getArgs(self, returnType, argList):
         if self.isConstructor:
@@ -14760,6 +14816,18 @@ class CGCallback(CGClass):
                 ],
                 body=body),
             ClassConstructor(
+                [Argument("JSContext*", "aCx"),
+                 Argument("JS::Handle<JSObject*>", "aCallback"),
+                 Argument("nsIGlobalObject*", "aIncumbentGlobal"),
+                 Argument("const FastCallbackConstructor&", "")],
+                bodyInHeader=True,
+                visibility="public",
+                explicit=True,
+                baseConstructors=[
+                    "%s(aCx, aCallback, aIncumbentGlobal, FastCallbackConstructor())" % self.baseName,
+                ],
+                body=body),
+            ClassConstructor(
                 [Argument("JS::Handle<JSObject*>", "aCallback"),
                  Argument("JS::Handle<JSObject*>", "aAsyncStack"),
                  Argument("nsIGlobalObject*", "aIncumbentGlobal")],
@@ -14922,6 +14990,47 @@ class CGCallbackFunction(CGCallback):
                 visibility="public",
                 explicit=True,
                 baseConstructors=["CallbackFunction(aOther)"])]
+
+
+class CGFastCallback(CGClass):
+    def __init__(self, idlObject):
+        self._deps = idlObject.getDeps()
+        baseName = idlObject.identifier.name
+        constructor = ClassConstructor(
+            [Argument("JSContext*", "aCx"),
+             Argument("JS::Handle<JSObject*>", "aCallback"),
+             Argument("nsIGlobalObject*", "aIncumbentGlobal")],
+            bodyInHeader=True,
+            visibility="public",
+            explicit=True,
+            baseConstructors=[
+                "%s(aCx, aCallback, aIncumbentGlobal, FastCallbackConstructor())" %
+                baseName,
+            ],
+            body="")
+
+        traceMethod = ClassMethod("Trace", "void",
+                                  [Argument("JSTracer*", "aTracer")],
+                                  inline=True,
+                                  bodyInHeader=True,
+                                  visibility="public",
+                                  body="%s::Trace(aTracer);\n" % baseName)
+        holdMethod = ClassMethod("HoldJSObjectsIfMoreThanOneOwner", "void",
+                                 [],
+                                 inline=True,
+                                 bodyInHeader=True,
+                                 visibility="public",
+                                 body=(
+                                     "%s::HoldJSObjectsIfMoreThanOneOwner();\n" %
+                                     baseName))
+
+        CGClass.__init__(self, "Fast%s" % baseName,
+                         bases=[ClassBase(baseName)],
+                         constructors=[constructor],
+                         methods=[traceMethod, holdMethod])
+
+    def deps(self):
+        return self._deps
 
 
 class CGCallbackInterface(CGCallback):

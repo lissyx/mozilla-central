@@ -78,78 +78,6 @@ private:
   const nsAutoPtr<FrameHistory> mFrameHistory;
 };
 
-class CircularByteBuffer
-{
-public:
-  CircularByteBuffer()
-    : mBuffer(nullptr), mCapacity(0), mStart(0), mCount(0)
-  {}
-
-  // Set the capacity of the buffer in bytes.  Must be called before any
-  // call to append or pop elements.
-  void SetCapacity(uint32_t aCapacity) {
-    MOZ_ASSERT(!mBuffer, "Buffer allocated.");
-    mCapacity = aCapacity;
-    mBuffer = MakeUnique<uint8_t[]>(mCapacity);
-  }
-
-  uint32_t Length() {
-    return mCount;
-  }
-
-  uint32_t Capacity() {
-    return mCapacity;
-  }
-
-  uint32_t Available() {
-    return Capacity() - Length();
-  }
-
-  // Append aLength bytes from aSrc to the buffer.  Caller must check that
-  // sufficient space is available.
-  void AppendElements(const uint8_t* aSrc, uint32_t aLength) {
-    MOZ_ASSERT(mBuffer && mCapacity, "Buffer not initialized.");
-    MOZ_ASSERT(aLength <= Available(), "Buffer full.");
-
-    uint32_t end = (mStart + mCount) % mCapacity;
-
-    uint32_t toCopy = std::min(mCapacity - end, aLength);
-    memcpy(&mBuffer[end], aSrc, toCopy);
-    memcpy(&mBuffer[0], aSrc + toCopy, aLength - toCopy);
-    mCount += aLength;
-  }
-
-  // Remove aSize bytes from the buffer.  Caller must check returned size in
-  // aSize{1,2} before using the pointer returned in aData{1,2}.  Caller
-  // must not specify an aSize larger than Length().
-  void PopElements(uint32_t aSize, void** aData1, uint32_t* aSize1,
-                   void** aData2, uint32_t* aSize2) {
-    MOZ_ASSERT(mBuffer && mCapacity, "Buffer not initialized.");
-    MOZ_ASSERT(aSize <= Length(), "Request too large.");
-
-    *aData1 = &mBuffer[mStart];
-    *aSize1 = std::min(mCapacity - mStart, aSize);
-    *aData2 = &mBuffer[0];
-    *aSize2 = aSize - *aSize1;
-    mCount -= *aSize1 + *aSize2;
-    mStart += *aSize1 + *aSize2;
-    mStart %= mCapacity;
-  }
-
-  size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
-  {
-    size_t amount = 0;
-    amount += aMallocSizeOf(mBuffer.get());
-    return amount;
-  }
-
-private:
-  UniquePtr<uint8_t[]> mBuffer;
-  uint32_t mCapacity;
-  uint32_t mStart;
-  uint32_t mCount;
-};
-
 /*
  * A bookkeeping class to track the read/write position of an audio buffer.
  */
@@ -313,7 +241,8 @@ protected:
   int64_t GetPositionInFramesUnlocked();
 
 private:
-  nsresult OpenCubeb(cubeb_stream_params &aParams);
+  nsresult OpenCubeb(cubeb_stream_params& aParams,
+                     TimeStamp aStartTime, bool aIsFirst);
 
   static long DataCallback_S(cubeb_stream*, void* aThis,
                              const void* /* aInputBuffer */, void* aOutputBuffer,
@@ -340,7 +269,8 @@ private:
   void GetUnprocessed(AudioBufferWriter& aWriter);
   void GetTimeStretched(AudioBufferWriter& aWriter);
 
-  void StartUnlocked();
+  template <typename Function, typename... Args>
+  int InvokeCubeb(Function aFunction, Args&&... aArgs);
 
   // The monitor is held to protect all access to member variables.
   Monitor mMonitor;
@@ -354,9 +284,6 @@ private:
   AudioClock mAudioClock;
   soundtouch::SoundTouch* mTimeStretcher;
 
-  // Stream start time for stream open delay telemetry.
-  TimeStamp mStartTime;
-
   // Output file for dumping audio
   FILE* mDumpFile;
 
@@ -365,8 +292,7 @@ private:
 
   enum StreamState {
     INITIALIZED, // Initialized, playback has not begun.
-    STARTED,     // cubeb started, but callbacks haven't started
-    RUNNING,     // DataCallbacks have started after STARTED, or after Resume().
+    STARTED,     // cubeb started.
     STOPPED,     // Stopped by a call to Pause().
     DRAINED,     // StateCallback has indicated that the drain is complete.
     ERRORED,     // Stream disabled due to an internal error.
@@ -374,7 +300,6 @@ private:
   };
 
   StreamState mState;
-  bool mIsFirst;
 
   DataSource& mDataSource;
 };

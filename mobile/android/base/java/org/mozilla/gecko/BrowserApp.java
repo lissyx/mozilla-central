@@ -9,8 +9,6 @@ import android.Manifest;
 import android.app.DownloadManager;
 import android.os.Environment;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.WorkerThread;
 import org.json.JSONArray;
 import org.mozilla.gecko.adjust.AdjustHelperInterface;
 import org.mozilla.gecko.annotation.RobocopTarget;
@@ -33,7 +31,6 @@ import org.mozilla.gecko.favicons.OnFaviconLoadedListener;
 import org.mozilla.gecko.favicons.decoders.IconDirectoryEntry;
 import org.mozilla.gecko.feeds.ContentNotificationsDelegate;
 import org.mozilla.gecko.feeds.FeedService;
-import org.mozilla.gecko.feeds.action.CheckForUpdatesAction;
 import org.mozilla.gecko.firstrun.FirstrunAnimationContainer;
 import org.mozilla.gecko.gfx.DynamicToolbarAnimator;
 import org.mozilla.gecko.gfx.DynamicToolbarAnimator.PinReason;
@@ -79,10 +76,9 @@ import org.mozilla.gecko.tabs.TabHistoryController.OnShowTabHistory;
 import org.mozilla.gecko.tabs.TabHistoryFragment;
 import org.mozilla.gecko.tabs.TabHistoryPage;
 import org.mozilla.gecko.tabs.TabsPanel;
+import org.mozilla.gecko.telemetry.TelemetryUploadService;
+import org.mozilla.gecko.telemetry.TelemetryCorePingDelegate;
 import org.mozilla.gecko.telemetry.measurements.SearchCountMeasurements;
-import org.mozilla.gecko.telemetry.TelemetryDispatcher;
-import org.mozilla.gecko.telemetry.UploadTelemetryCorePingCallback;
-import org.mozilla.gecko.telemetry.measurements.SessionMeasurements;
 import org.mozilla.gecko.toolbar.AutocompleteHandler;
 import org.mozilla.gecko.toolbar.BrowserToolbar;
 import org.mozilla.gecko.toolbar.BrowserToolbar.TabEditingState;
@@ -97,6 +93,7 @@ import org.mozilla.gecko.util.FloatUtils;
 import org.mozilla.gecko.util.GamepadUtils;
 import org.mozilla.gecko.util.GeckoEventListener;
 import org.mozilla.gecko.util.HardwareUtils;
+import org.mozilla.gecko.util.IntentUtils;
 import org.mozilla.gecko.util.MenuUtils;
 import org.mozilla.gecko.util.NativeEventListener;
 import org.mozilla.gecko.util.NativeJSObject;
@@ -177,10 +174,10 @@ import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import java.util.Vector;
 import java.util.regex.Pattern;
 
@@ -199,8 +196,6 @@ public class BrowserApp extends GeckoApp
     private static final String LOGTAG = "GeckoBrowserApp";
 
     private static final int TABS_ANIMATION_DURATION = 450;
-
-    public static final String GUEST_BROWSING_ARG = "--guest";
 
     // Intent String extras used to specify custom Switchboard configurations.
     private static final String INTENT_KEY_SWITCHBOARD_HOST = "switchboard-host";
@@ -313,14 +308,12 @@ public class BrowserApp extends GeckoApp
             (BrowserAppDelegate) new ScreenshotDelegate(),
             (BrowserAppDelegate) new BookmarkStateChangeDelegate(),
             (BrowserAppDelegate) new ReaderViewBookmarkPromotion(),
-            (BrowserAppDelegate) new ContentNotificationsDelegate()
+            (BrowserAppDelegate) new ContentNotificationsDelegate(),
+            new TelemetryCorePingDelegate()
     ));
 
     @NonNull
     private SearchEngineManager mSearchEngineManager; // Contains reference to Context - DO NOT LEAK!
-
-    private TelemetryDispatcher mTelemetryDispatcher;
-    private final SessionMeasurements mSessionMeasurements = new SessionMeasurements();
 
     private boolean mHasResumed;
 
@@ -549,20 +542,7 @@ public class BrowserApp extends GeckoApp
         }
 
         final Intent intent = getIntent();
-
-        // Note that we're calling GeckoProfile.get *before GeckoApp.onCreate*.
-        // This means we're reliant on the logic in GeckoProfile to correctly
-        // look up our launch intent (via BrowserApp's Activity-ness) and pull
-        // out the arguments. Be careful if you change that!
-        final GeckoProfile p = GeckoProfile.get(this);
-
-        if (p != null && !p.inGuestMode()) {
-            // This is *only* valid because we never want to use the guest mode
-            // profile concurrently with a normal profile -- no syncing to it,
-            // no dual-profile usage, nothing. BrowserApp startup with a conventional
-            // GeckoProfile will cause the guest profile to be deleted.
-            GeckoProfile.maybeCleanupGuestProfile(this);
-        }
+        configureForTestsBasedOnEnvironment(intent);
 
         // This has to be prepared prior to calling GeckoApp.onCreate, because
         // widget code and BrowserToolbar need it, and they're created by the
@@ -703,7 +683,6 @@ public class BrowserApp extends GeckoApp
         distribution.addOnDistributionReadyCallback(new DistributionStoreCallback(this, profile.getName()));
 
         mSearchEngineManager = new SearchEngineManager(this, distribution);
-        mTelemetryDispatcher = new TelemetryDispatcher(profile.getDir().getAbsolutePath());
 
         // Init suggested sites engine in BrowserDB.
         final SuggestedSites suggestedSites = new SuggestedSites(appContext, distribution);
@@ -780,11 +759,27 @@ public class BrowserApp extends GeckoApp
     }
 
     /**
+     * Sets up the testing configuration if the environment is configured as such.
+     *
+     * We need to read environment variables from the intent string
+     * extra because environment variables from our test harness aren't set
+     * until Gecko is loaded, and we need to know this before then.
+     *
+     * This method should be called early since other initialization
+     * may depend on its results.
+     */
+    private void configureForTestsBasedOnEnvironment(final Intent intent) {
+        final HashMap<String, String> envVars = IntentUtils.getEnvVarMap(intent);
+        Experiments.setDisabledFromEnvVar(envVars);
+        TelemetryUploadService.setDisabledFromEnvVar(envVars);
+    }
+
+    /**
      * Initializes the default Switchboard URLs the first time.
      * @param intent
      */
-    private void initSwitchboard(Intent intent) {
-        if (Experiments.isDisabled(new SafeIntent(intent)) || !AppConstants.MOZ_SWITCHBOARD) {
+    private void initSwitchboard(final Intent intent) {
+        if (Experiments.isDisabled() || !AppConstants.MOZ_SWITCHBOARD) {
             return;
         }
 
@@ -1003,7 +998,6 @@ public class BrowserApp extends GeckoApp
 
         // Needed for Adjust to get accurate session measurements
         AdjustConstants.getAdjustHelper().onResume();
-        mSessionMeasurements.recordSessionStart();
 
         if (!mHasResumed) {
             EventDispatcher.getInstance().unregisterGeckoThreadListener((GeckoEventListener) this,
@@ -1027,10 +1021,6 @@ public class BrowserApp extends GeckoApp
 
         // Needed for Adjust to get accurate session measurements
         AdjustConstants.getAdjustHelper().onPause();
-
-        // onStart/onStop is ideal over onResume/onPause. However, onStop is not guaranteed to be called and
-        // dealing with that possibility adds a lot of complexity that we don't want to handle at this point.
-        mSessionMeasurements.recordSessionEnd(this);
 
         if (mHasResumed) {
             // Register for Prompt:ShowTop so we can foreground this activity even if it's hidden.
@@ -1084,15 +1074,6 @@ public class BrowserApp extends GeckoApp
                 FileCleanupController.startIfReady(BrowserApp.this, sharedPrefs, profile.getDir().getAbsolutePath());
             }
         });
-
-        // We don't upload in onCreate because that's only called when the Activity needs to be instantiated
-        // and it's possible the system will never free the Activity from memory.
-        //
-        // We don't upload in onResume/onPause because that will be called each time the Activity is obscured,
-        // including by our own Activities/dialogs, and there is no reason to upload each time we're unobscured.
-        //
-        // So we're left with onStart/onStop.
-        mSearchEngineManager.getEngine(new UploadTelemetryCorePingCallback(BrowserApp.this));
 
         for (final BrowserAppDelegate delegate : delegates) {
             delegate.onStart(this);
@@ -1750,6 +1731,8 @@ public class BrowserApp extends GeckoApp
             final boolean hasCustomHomepanels = prefs.contains(HomeConfigPrefsBackend.PREFS_CONFIG_KEY) || prefs.contains(HomeConfigPrefsBackend.PREFS_CONFIG_KEY_OLD);
             Telemetry.addToHistogram("FENNEC_HOMEPANELS_CUSTOM", hasCustomHomepanels ? 1 : 0);
 
+            Telemetry.addToHistogram("FENNEC_READER_VIEW_CACHE_SIZE", SavedReaderViewHelper.getSavedReaderViewHelper(getContext()).getDiskSpacedUsedKB());
+
             if (Versions.feature16Plus) {
                 Telemetry.addToHistogram("BROWSER_IS_ASSIST_DEFAULT", (isDefaultBrowser(Intent.ACTION_ASSIST) ? 1 : 0));
             }
@@ -2332,11 +2315,7 @@ public class BrowserApp extends GeckoApp
 
         final boolean isUserSearchTerm = selectedTab != null &&
                 !TextUtils.isEmpty(selectedTab.getUserRequested());
-        if (isUserSearchTerm && SwitchBoard.isInExperiment(getContext(), Experiments.SEARCH_TERM)) {
-            showBrowserSearchAfterAnimation(animator);
-        } else {
-            showHomePagerWithAnimator(panelId, null, animator);
-        }
+        showHomePagerWithAnimator(panelId, null, animator);
 
         animator.start();
         Telemetry.startUISession(TelemetryContract.Session.AWESOMESCREEN);
@@ -2440,7 +2419,7 @@ public class BrowserApp extends GeckoApp
         // We could include the engine identifier as an extra but we'll
         // just capture that with core ping telemetry (bug 1253319).
         Telemetry.sendUIEvent(TelemetryContract.Event.SEARCH, where);
-        SearchCountMeasurements.incrementSearch(prefs, engineIdentifier, where.name());
+        SearchCountMeasurements.incrementSearch(prefs, engineIdentifier, where.toString());
     }
 
     /**
@@ -3636,23 +3615,27 @@ public class BrowserApp extends GeckoApp
     }
 
     public void showGuestModeDialog(final GuestModeDialog type) {
+        if ((type == GuestModeDialog.ENTERING) == getProfile().inGuestMode()) {
+            // Don't show enter dialog if we are already in guest mode; same with leaving.
+            return;
+        }
+
         final Prompt ps = new Prompt(this, new Prompt.PromptCallback() {
             @Override
             public void onPromptFinished(String result) {
                 try {
                     int itemId = new JSONObject(result).getInt("button");
                     if (itemId == 0) {
-                        String args = "";
+                        final Context context = GeckoAppShell.getApplicationContext();
                         if (type == GuestModeDialog.ENTERING) {
-                            args = GUEST_BROWSING_ARG;
+                            GuestSession.enter(context);
                         } else {
-                            GeckoProfile.leaveGuestSession(BrowserApp.this);
-
-                            // Now's a good time to make sure we're not displaying the Guest Browsing notification.
-                            GuestSession.hideNotification(BrowserApp.this);
+                            GuestSession.leave(context);
+                            // Now's a good time to make sure we're not displaying the
+                            // Guest Browsing notification.
+                            GuestSession.hideNotification(context);
                         }
-
-                        doRestart(args);
+                        doRestart();
                     }
                 } catch (JSONException ex) {
                     Log.e(LOGTAG, "Exception reading guest mode prompt result", ex);
@@ -3920,12 +3903,8 @@ public class BrowserApp extends GeckoApp
     @Override
     public int getLayout() { return R.layout.gecko_app; }
 
-    public TelemetryDispatcher getTelemetryDispatcher() {
-        return mTelemetryDispatcher;
-    }
-
-    public SessionMeasurements getSessionMeasurementDelegate() {
-        return mSessionMeasurements;
+    public SearchEngineManager getSearchEngineManager() {
+        return mSearchEngineManager;
     }
 
     // For use from tests only.

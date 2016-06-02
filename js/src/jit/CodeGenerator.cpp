@@ -4939,6 +4939,42 @@ CodeGenerator::emitDebugResultChecks(LInstruction* ins)
         break;
     }
 }
+
+void
+CodeGenerator::emitDebugForceBailing(LInstruction* lir)
+{
+    if (!lir->snapshot())
+        return;
+    if (lir->isStart())
+        return;
+    if (lir->isOsiPoint())
+        return;
+
+    const void* bailAfterAddr = GetJitContext()->runtime->addressOfIonBailAfter();
+
+    AllocatableGeneralRegisterSet regs(GeneralRegisterSet::All());
+
+    Label done, notBail, bail;
+    masm.branch32(Assembler::Equal, AbsoluteAddress(bailAfterAddr), Imm32(0), &done);
+    {
+        Register temp = regs.takeAny();
+
+        masm.push(temp);
+        masm.load32(AbsoluteAddress(bailAfterAddr), temp);
+        masm.sub32(Imm32(1), temp);
+        masm.store32(temp, AbsoluteAddress(bailAfterAddr));
+
+        masm.branch32(Assembler::NotEqual, temp, Imm32(0), &notBail);
+        {
+            masm.pop(temp);
+            masm.jump(&bail);
+            bailoutFrom(&bail, lir->snapshot());
+        }
+        masm.bind(&notBail);
+        masm.pop(temp);
+    }
+    masm.bind(&done);
+}
 #endif
 
 bool
@@ -5026,6 +5062,10 @@ CodeGenerator::generateBody()
                         return false;
                 }
             }
+
+#ifdef DEBUG
+            emitDebugForceBailing(*iter);
+#endif
 
             iter->accept(this);
 
@@ -8748,11 +8788,11 @@ CodeGenerator::visitRest(LRest* lir)
 }
 
 bool
-CodeGenerator::generateAsmJS(wasm::FuncOffsets* offsets)
+CodeGenerator::generateWasm(uint32_t sigIndex, wasm::FuncOffsets* offsets)
 {
     JitSpew(JitSpew_Codegen, "# Emitting asm.js code");
 
-    wasm::GenerateFunctionPrologue(masm, frameSize(), offsets);
+    wasm::GenerateFunctionPrologue(masm, frameSize(), sigIndex, offsets);
 
     // Overflow checks are omitted by CodeGenerator in some cases (leaf
     // functions with small framePushed). Perform overflow-checking after

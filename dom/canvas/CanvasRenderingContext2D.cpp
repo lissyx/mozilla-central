@@ -82,7 +82,7 @@
 #include "mozilla/dom/PBrowserParent.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/dom/TypedArray.h"
-#include "mozilla/Endian.h"
+#include "mozilla/EndianUtils.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/Helpers.h"
 #include "mozilla/gfx/PathHelpers.h"
@@ -319,6 +319,11 @@ public:
     nsIntRegion fillPaintNeededRegion;
     nsIntRegion strokePaintNeededRegion;
 
+    if (aCtx->CurrentState().updateFilterOnWriteOnly) {
+      aCtx->UpdateFilter();
+      aCtx->CurrentState().updateFilterOnWriteOnly = false;
+    }
+
     FilterSupport::ComputeSourceNeededRegions(
       aCtx->CurrentState().filter, mPostFilterBounds,
       sourceGraphicNeededRegion, fillPaintNeededRegion, strokePaintNeededRegion);
@@ -405,6 +410,12 @@ public:
       mCtx->CurrentState().filterAdditionalImages,
       mPostFilterBounds.TopLeft() - mOffset,
       DrawOptions(1.0f, mCompositionOp));
+
+    const gfx::FilterDescription& filter = mCtx->CurrentState().filter;
+    MOZ_ASSERT(!filter.mPrimitives.IsEmpty());
+    if (filter.mPrimitives.LastElement().IsTainted() && mCtx->mCanvasElement) {
+      mCtx->mCanvasElement->SetWriteOnly();
+    }
   }
 
   DrawTarget* DT()
@@ -2468,6 +2479,9 @@ CanvasRenderingContext2D::SetFilter(const nsAString& aFilter, ErrorResult& aErro
       UpdateFilter();
     }
   }
+  if (mCanvasElement && !mCanvasElement->IsWriteOnly()) {
+    CurrentState().updateFilterOnWriteOnly = true;
+  }
 }
 
 class CanvasUserSpaceMetrics : public UserSpaceMetricsWithSize
@@ -3582,6 +3596,22 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
       // throughout the text layout process
     }
 
+    mCtx->EnsureTarget();
+
+    // If the operation is 'fill' with a simple color, we defer to gfxTextRun
+    // which will handle color/svg-in-ot fonts appropriately. Such fonts will
+    // not render well via the code below.
+    if (mOp == CanvasRenderingContext2D::TextDrawOperation::FILL &&
+        mState->StyleIsColor(CanvasRenderingContext2D::Style::FILL)) {
+      RefPtr<gfxContext> thebes =
+        gfxContext::ForDrawTargetWithTransform(mCtx->mTarget);
+      nscolor fill = mState->colorStyles[CanvasRenderingContext2D::Style::FILL];
+      thebes->SetColor(Color::FromABGR(fill));
+      gfxTextRun::DrawParams params(thebes);
+      mTextRun->Draw(gfxTextRun::Range(mTextRun.get()), point, params);
+      return;
+    }
+
     uint32_t numRuns;
     const gfxTextRun::GlyphRun *runs = mTextRun->GetGlyphRuns(&numRuns);
     const int32_t appUnitsPerDevUnit = mAppUnitsPerDevPixel;
@@ -3591,7 +3621,6 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
 
     float advanceSum = 0;
 
-    mCtx->EnsureTarget();
     for (uint32_t c = 0; c < numRuns; c++) {
       gfxFont *font = runs[c].mFont;
 

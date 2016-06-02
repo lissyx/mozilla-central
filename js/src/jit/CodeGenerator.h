@@ -66,7 +66,7 @@ class CodeGenerator : public CodeGeneratorSpecific
 
   public:
     MOZ_MUST_USE bool generate();
-    MOZ_MUST_USE bool generateAsmJS(wasm::FuncOffsets *offsets);
+    MOZ_MUST_USE bool generateWasm(uint32_t sigIndex, wasm::FuncOffsets *offsets);
     MOZ_MUST_USE bool link(JSContext* cx, CompilerConstraintList* constraints);
     MOZ_MUST_USE bool linkSharedStubs(JSContext* cx);
 
@@ -415,6 +415,10 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitRotate(LRotate* ins);
 
     void visitRandom(LRandom* ins);
+
+#ifdef DEBUG
+    void emitDebugForceBailing(LInstruction* lir);
+#endif
 
     IonScriptCounts* extractScriptCounts() {
         IonScriptCounts* counts = scriptCounts_;

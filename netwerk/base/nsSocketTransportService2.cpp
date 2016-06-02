@@ -31,8 +31,8 @@
 #include "mozilla/WindowsVersion.h"
 #endif
 
-using namespace mozilla;
-using namespace mozilla::net;
+namespace mozilla {
+namespace net {
 
 LazyLogModule gSocketTransportLog("nsSocketTransport");
 LazyLogModule gUDPSocketLog("UDPSocket");
@@ -105,8 +105,6 @@ nsSocketTransportService::nsSocketTransportService()
     , mIdleCount(0)
     , mSentBytesCount(0)
     , mReceivedBytesCount(0)
-    , mEventQueueLock("nsSocketTransportService::mEventQueueLock")
-    , mPendingSocketQ(mEventQueueLock)
     , mSendBufferSize(0)
     , mKeepaliveIdleTimeS(600)
     , mKeepaliveRetryIntervalS(1)
@@ -163,7 +161,7 @@ nsSocketTransportService::DispatchFromScript(nsIRunnable *event, uint32_t flags)
 }
 
 NS_IMETHODIMP
-nsSocketTransportService::Dispatch(already_AddRefed<nsIRunnable>&& event, uint32_t flags)
+nsSocketTransportService::Dispatch(already_AddRefed<nsIRunnable> event, uint32_t flags)
 {
     nsCOMPtr<nsIRunnable> event_ref(event);
     SOCKET_LOG(("STS dispatch [%p]\n", event_ref.get()));
@@ -180,7 +178,7 @@ nsSocketTransportService::Dispatch(already_AddRefed<nsIRunnable>&& event, uint32
 }
 
 NS_IMETHODIMP
-nsSocketTransportService::DelayedDispatch(already_AddRefed<nsIRunnable>&&, uint32_t)
+nsSocketTransportService::DelayedDispatch(already_AddRefed<nsIRunnable>, uint32_t)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -207,10 +205,8 @@ nsSocketTransportService::NotifyWhenCanAttachSocket(nsIRunnable *event)
         return Dispatch(event, NS_DISPATCH_NORMAL);
     }
 
-    {
-      MutexAutoLock lock(mEventQueueLock);
-      mPendingSocketQ.PutEvent(event, lock);
-    }
+    LinkedRunnableEvent *runnable = new LinkedRunnableEvent(event);
+    mPendingSocketQueue.insertBack(runnable);
     return NS_OK;
 }
 
@@ -246,20 +242,14 @@ bool
 nsSocketTransportService::CanAttachSocket()
 {
     static bool reported900FDLimit = false;
-    static bool reported256FDLimit = false;
 
     uint32_t total = mActiveCount + mIdleCount;
     bool rv = total < gMaxCount;
 
-    if (mTelemetryEnabledPref) {
-        if (((total >= 900) || !rv) && !reported900FDLimit) {
-            reported900FDLimit = true;
-            Telemetry::Accumulate(Telemetry::NETWORK_SESSION_AT_900FD, true);
-        }
-        if ((total >= 256) && !reported256FDLimit) {
-            reported256FDLimit = true;
-            Telemetry::Accumulate(Telemetry::NETWORK_SESSION_AT_256FD, true);
-        }
+    if (mTelemetryEnabledPref &&
+        (((total >= 900) || !rv) && !reported900FDLimit)) {
+        reported900FDLimit = true;
+        Telemetry::Accumulate(Telemetry::NETWORK_SESSION_AT_900FD, true);
     }
 
     return rv;
@@ -292,9 +282,11 @@ nsSocketTransportService::DetachSocket(SocketContext *listHead, SocketContext *s
     // notify the first element on the pending socket queue...
     //
     nsCOMPtr<nsIRunnable> event;
-    {
-      MutexAutoLock lock(mEventQueueLock);
-      mPendingSocketQ.GetPendingEvent(getter_AddRefs(event), lock);
+    LinkedRunnableEvent *runnable = mPendingSocketQueue.getFirst();
+    if (runnable) {
+        event = runnable->TakeEvent();
+        runnable->remove();
+        delete runnable;
     }
     if (event) {
         // move event from pending queue to dispatch queue
@@ -644,7 +636,7 @@ nsSocketTransportService::Shutdown()
         mAfterWakeUpTimer = nullptr;
     }
 
-    mozilla::net::NetworkActivityMonitor::Shutdown();
+    NetworkActivityMonitor::Shutdown();
 
     mInitialized = false;
     mShuttingDown = false;
@@ -1196,7 +1188,7 @@ nsSocketTransportService::UpdateSendBufferPref(nsIPrefBranch *pref)
 
 #if defined(XP_WIN)
     // If the pref is not set but this is windows set it depending on windows version
-    if (!mozilla::IsWin2003OrLater()) { // windows xp
+    if (!IsWin2003OrLater()) { // windows xp
         mSendBufferSize = 131072;
     } else { // vista or later
         mSendBufferSize = 131072 * 4;
@@ -1376,7 +1368,7 @@ nsSocketTransportService::ClosePrivateConnections()
         }
     }
 
-    mozilla::ClearPrivateSSLState();
+    ClearPrivateSSLState();
 }
 
 NS_IMETHODIMP
@@ -1553,3 +1545,6 @@ nsSocketTransportService::GetSocketConnections(nsTArray<SocketInfo> *data)
     for (uint32_t i = 0; i < mIdleCount; i++)
         AnalyzeConnection(data, &mIdleList[i], false);
 }
+
+} // namespace net
+} // namespace mozilla

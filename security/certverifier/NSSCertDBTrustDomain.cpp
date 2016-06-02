@@ -101,9 +101,9 @@ FindIssuerInner(const UniqueCERTCertList& candidates, bool useRoots,
       const_cast<unsigned char*>(encodedIssuerName.UnsafeGetData()),
       encodedIssuerName.GetLength()
     };
-    ScopedSECItem nameConstraints(::SECITEM_AllocItem(nullptr, nullptr, 0));
+    ScopedAutoSECItem nameConstraints;
     SECStatus srv = CERT_GetImposedNameConstraints(&encodedIssuerNameItem,
-                                                   nameConstraints.get());
+                                                   &nameConstraints);
     if (srv != SECSuccess) {
       if (PR_GetError() != SEC_ERROR_EXTENSION_NOT_FOUND) {
         return Result::FATAL_ERROR_LIBRARY_FAILURE;
@@ -114,9 +114,8 @@ FindIssuerInner(const UniqueCERTCertList& candidates, bool useRoots,
     } else {
       // Otherwise apply the constraints
       Input nameConstraintsInput;
-      if (nameConstraintsInput.Init(
-              nameConstraints->data,
-              nameConstraints->len) != Success) {
+      if (nameConstraintsInput.Init(nameConstraints.data, nameConstraints.len)
+            != Success) {
         return Result::FATAL_ERROR_LIBRARY_FAILURE;
       }
       rv = checker.Check(certDER, &nameConstraintsInput, keepGoing);
@@ -959,40 +958,6 @@ NSSCertDBTrustDomain::NetscapeStepUpMatchesServerAuth(Time notBefore,
   return Result::FATAL_ERROR_LIBRARY_FAILURE;
 }
 
-namespace {
-
-static char*
-nss_addEscape(const char* string, char quote)
-{
-  char* newString = 0;
-  size_t escapes = 0, size = 0;
-  const char* src;
-  char* dest;
-
-  for (src = string; *src; src++) {
-  if ((*src == quote) || (*src == '\\')) {
-    escapes++;
-  }
-  size++;
-  }
-
-  newString = (char*) PORT_ZAlloc(escapes + size + 1u);
-  if (!newString) {
-    return nullptr;
-  }
-
-  for (src = string, dest = newString; *src; src++, dest++) {
-    if ((*src == quote) || (*src == '\\')) {
-      *dest++ = '\\';
-    }
-    *dest = *src;
-  }
-
-  return newString;
-}
-
-} // unnamed namespace
-
 SECStatus
 InitializeNSS(const char* dir, bool readOnly, bool loadPKCS11Modules)
 {
@@ -1038,9 +1003,11 @@ LoadLoadableRoots(/*optional*/ const char* dir, const char* modNameUTF8)
     return SECFailure;
   }
 
-  UniquePORTString escapedFullLibraryPath(nss_addEscape(fullLibraryPath.get(),
-                                                        '\"'));
-  if (!escapedFullLibraryPath) {
+  // Escape the \ and " characters.
+  nsAutoCString escapedFullLibraryPath(fullLibraryPath.get());
+  escapedFullLibraryPath.ReplaceSubstring("\\", "\\\\");
+  escapedFullLibraryPath.ReplaceSubstring("\"", "\\\"");
+  if (escapedFullLibraryPath.IsEmpty()) {
     return SECFailure;
   }
 

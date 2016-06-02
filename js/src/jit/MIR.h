@@ -13,6 +13,7 @@
 #define jit_MIR_h
 
 #include "mozilla/Array.h"
+#include "mozilla/Attributes.h"
 
 #include "builtin/SIMD.h"
 #include "jit/AtomicOp.h"
@@ -60,7 +61,7 @@ MIRType MIRTypeFromValue(const js::Value& vp)
           case JS_UNINITIALIZED_LEXICAL:
             return MIRType::MagicUninitializedLexical;
           default:
-            MOZ_ASSERT(!"Unexpected magic constant");
+            MOZ_ASSERT_UNREACHABLE("Unexpected magic constant");
         }
     }
     return MIRTypeFromValueType(vp.extractNonDoubleType());
@@ -844,7 +845,7 @@ class MDefinition : public MNode
     // Replace the current instruction by an optimized-out constant in all uses
     // of the current instruction. Note, that optimized-out constant should not
     // be observed, and thus they should not flow in any computation.
-    void optimizeOutAllUses(TempAllocator& alloc);
+    MOZ_MUST_USE bool optimizeOutAllUses(TempAllocator& alloc);
 
     // Replace the current instruction by a dominating instruction |dom| in all
     // instruction, but keep the current instruction for resume point and
@@ -1705,13 +1706,13 @@ class MSimdConvert
         }
     }
 
-  public:
-    INSTRUCTION_HEADER(SimdConvert)
-
     static MSimdConvert* New(TempAllocator& alloc, MDefinition* obj, MIRType toType, SimdSign sign)
     {
-        return new(alloc) MSimdConvert(obj, toType, sign);
+        return new (alloc) MSimdConvert(obj, toType, sign);
     }
+
+  public:
+    INSTRUCTION_HEADER(SimdConvert)
 
     // Create a MSimdConvert instruction and add it to the basic block.
     // Possibly create and add an equivalent sequence of instructions instead if
@@ -1984,6 +1985,10 @@ class MSimdShuffleBase
     }
 
   public:
+    unsigned numLanes() const {
+        return arity_;
+    }
+
     unsigned lane(unsigned i) const {
         MOZ_ASSERT(i < arity_);
         return lane_[i];
@@ -2284,14 +2289,14 @@ class MSimdBinaryComp
             setCommutative();
     }
 
-  public:
-    INSTRUCTION_HEADER(SimdBinaryComp)
-
     static MSimdBinaryComp* New(TempAllocator& alloc, MDefinition* left, MDefinition* right,
                                 Operation op, SimdSign sign)
     {
-        return new(alloc) MSimdBinaryComp(left, right, op, sign);
+        return new (alloc) MSimdBinaryComp(left, right, op, sign);
     }
+
+  public:
+    INSTRUCTION_HEADER(SimdBinaryComp)
 
     // Create a MSimdBinaryComp or an equivalent sequence of instructions
     // supported by the current target.
@@ -2375,13 +2380,20 @@ class MSimdBinaryArith
             setCommutative();
     }
 
-  public:
-    INSTRUCTION_HEADER(SimdBinaryArith)
     static MSimdBinaryArith* New(TempAllocator& alloc, MDefinition* left, MDefinition* right,
                                  Operation op)
     {
-        return new(alloc) MSimdBinaryArith(left, right, op);
+        return new (alloc) MSimdBinaryArith(left, right, op);
     }
+
+  public:
+    INSTRUCTION_HEADER(SimdBinaryArith)
+
+    // Create an MSimdBinaryArith instruction and add it to the basic block. Possibly
+    // create and add an equivalent sequence of instructions instead if the
+    // current target doesn't support the requested shift operation directly.
+    static MInstruction* AddLegalized(TempAllocator& alloc, MBasicBlock* addTo, MDefinition* left,
+                                      MDefinition* right, Operation op);
 
     AliasSet getAliasSet() const override {
         return AliasSet::None();
@@ -2398,6 +2410,72 @@ class MSimdBinaryArith
     void printOpcode(GenericPrinter& out) const override;
 
     ALLOW_CLONE(MSimdBinaryArith)
+};
+
+class MSimdBinarySaturating
+  : public MBinaryInstruction,
+    public MixPolicy<SimdSameAsReturnedTypePolicy<0>, SimdSameAsReturnedTypePolicy<1>>::Data
+{
+  public:
+    enum Operation
+    {
+        add,
+        sub,
+    };
+
+    static const char* OperationName(Operation op)
+    {
+        switch (op) {
+          case add:
+            return "add";
+          case sub:
+            return "sub";
+        }
+        MOZ_CRASH("unexpected operation");
+    }
+
+  private:
+    Operation operation_;
+    SimdSign sign_;
+
+    MSimdBinarySaturating(MDefinition* left, MDefinition* right, Operation op, SimdSign sign)
+      : MBinaryInstruction(left, right)
+      , operation_(op)
+      , sign_(sign)
+    {
+        MOZ_ASSERT(left->type() == right->type());
+        MIRType type = left->type();
+        MOZ_ASSERT(type == MIRType::Int8x16 || type == MIRType::Int16x8);
+        setResultType(type);
+        setMovable();
+        if (op == add)
+            setCommutative();
+    }
+
+  public:
+    INSTRUCTION_HEADER(SimdBinarySaturating)
+    static MSimdBinarySaturating* New(TempAllocator& alloc, MDefinition* left, MDefinition* right,
+                                      Operation op, SimdSign sign)
+    {
+        return new (alloc) MSimdBinarySaturating(left, right, op, sign);
+    }
+
+    AliasSet getAliasSet() const override { return AliasSet::None(); }
+
+    Operation operation() const { return operation_; }
+    SimdSign signedness() const { return sign_; }
+
+    bool congruentTo(const MDefinition* ins) const override
+    {
+        if (!binaryCongruentTo(ins))
+            return false;
+        return operation_ == ins->toSimdBinarySaturating()->operation() &&
+               sign_ == ins->toSimdBinarySaturating()->signedness();
+    }
+
+    void printOpcode(GenericPrinter& out) const override;
+
+    ALLOW_CLONE(MSimdBinarySaturating)
 };
 
 class MSimdBinaryBitwise
@@ -2482,14 +2560,21 @@ class MSimdShift
         setMovable();
     }
 
-  public:
-    INSTRUCTION_HEADER(SimdShift)
-
     static MSimdShift* New(TempAllocator& alloc, MDefinition* left, MDefinition* right,
                            Operation op)
     {
-        return new(alloc) MSimdShift(left, right, op);
+        return new (alloc) MSimdShift(left, right, op);
     }
+
+  public:
+    INSTRUCTION_HEADER(SimdShift)
+
+    // Create an MSimdShift instruction and add it to the basic block. Possibly
+    // create and add an equivalent sequence of instructions instead if the
+    // current target doesn't support the requested shift operation directly.
+    // Return the inserted MInstruction that computes the shifted value.
+    static MInstruction* AddLegalized(TempAllocator& alloc, MBasicBlock* addTo, MDefinition* left,
+                                      MDefinition* right, Operation op);
 
     // Get the relevant right shift operation given the signedness of a type.
     static Operation rshForSign(SimdSign sign) {
@@ -8534,7 +8619,6 @@ class MElements
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
-    AliasType mightAlias(const MDefinition* store) const override;
 
     ALLOW_CLONE(MElements)
 };
@@ -8728,7 +8812,6 @@ class MInitializedLength
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
-    AliasType mightAlias(const MDefinition* store) const override;
 
     void computeRange(TempAllocator& alloc) override;
 
@@ -8826,7 +8909,6 @@ class MUnboxedArrayInitializedLength
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::ObjectFields);
     }
-    AliasType mightAlias(const MDefinition* store) const override;
 
     ALLOW_CLONE(MUnboxedArrayInitializedLength)
 };
@@ -9458,7 +9540,6 @@ class MLoadElement
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::Element);
     }
-    AliasType mightAlias(const MDefinition* store) const override;
 
     ALLOW_CLONE(MLoadElement)
 };
@@ -9615,7 +9696,6 @@ class MLoadUnboxedObjectOrNull
         return AliasSet::Load(AliasSet::UnboxedElement);
     }
     MDefinition* foldsTo(TempAllocator& alloc) override;
-    AliasType mightAlias(const MDefinition* store) const override;
 
     ALLOW_CLONE(MLoadUnboxedObjectOrNull)
 };
@@ -9665,7 +9745,6 @@ class MLoadUnboxedString
     AliasSet getAliasSet() const override {
         return AliasSet::Load(AliasSet::UnboxedElement);
     }
-    AliasType mightAlias(const MDefinition* store) const override;
 
     ALLOW_CLONE(MLoadUnboxedString)
 };
@@ -10273,7 +10352,6 @@ class MLoadUnboxedScalar
             return AliasSet::Store(AliasSet::UnboxedElement);
         return AliasSet::Load(AliasSet::UnboxedElement);
     }
-    AliasType mightAlias(const MDefinition* store) const override;
 
     bool congruentTo(const MDefinition* ins) const override {
         if (requiresBarrier_)
@@ -11150,7 +11228,7 @@ class MGetPropertyPolymorphic
     PropertyName* name() const {
         return name_;
     }
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     AliasSet getAliasSet() const override {
@@ -11223,7 +11301,7 @@ class MSetPropertyPolymorphic
     PropertyName* name() const {
         return name_;
     }
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     MDefinition* value() const {
@@ -11509,7 +11587,7 @@ class MGuardShape
         return new(alloc) MGuardShape(obj, shape, bailoutKind);
     }
 
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     const Shape* shape() const {
@@ -11556,7 +11634,7 @@ class MGuardReceiverPolymorphic
         return new(alloc) MGuardReceiverPolymorphic(alloc, obj);
     }
 
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
 
@@ -11611,7 +11689,7 @@ class MGuardObjectGroup
         return new(alloc) MGuardObjectGroup(obj, group, bailOnEquality, bailoutKind);
     }
 
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     const ObjectGroup* group() const {
@@ -11663,7 +11741,7 @@ class MGuardObjectIdentity
         return new(alloc) MGuardObjectIdentity(obj, expected, bailOnEquality);
     }
 
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     MDefinition* expected() const {
@@ -11706,7 +11784,7 @@ class MGuardClass
         return new(alloc) MGuardClass(obj, clasp);
     }
 
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     const Class* getClass() const {
@@ -11752,7 +11830,7 @@ class MGuardUnboxedExpando
         return new(alloc) MGuardUnboxedExpando(obj, requireExpando, bailoutKind);
     }
 
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     bool requireExpando() const {
@@ -12363,7 +12441,7 @@ class MSetDOMProperty
         return func_;
     }
 
-    MDefinition* object() {
+    MDefinition* object() const {
         return getOperand(0);
     }
 
@@ -12465,7 +12543,7 @@ class MGetDOMProperty
     bool valueMayBeInSlot() const {
         return info_->isLazilyCachedInSlot;
     }
-    MDefinition* object() {
+    MDefinition* object() const {
         return getOperand(0);
     }
 
@@ -13910,7 +13988,7 @@ public:
     static MGuardSharedTypedArray* New(TempAllocator& alloc, MDefinition* obj) {
         return new(alloc) MGuardSharedTypedArray(obj);
     }
-    MDefinition* obj() const {
+    MDefinition* object() const {
         return getOperand(0);
     }
     AliasSet getAliasSet() const override {
@@ -14432,38 +14510,36 @@ class MAsmJSLoadFuncPtr
   : public MUnaryInstruction,
     public NoTypePolicy::Data
 {
-    MAsmJSLoadFuncPtr(MDefinition* index, bool hasLimit, uint32_t limit, bool alwaysThrow,
-                      unsigned globalDataOffset)
-      : MUnaryInstruction(index), hasLimit_(hasLimit), limit_(limit), alwaysThrow_(alwaysThrow),
-        globalDataOffset_(globalDataOffset)
+    MAsmJSLoadFuncPtr(MDefinition* index, uint32_t limit, unsigned globalDataOffset)
+      : MUnaryInstruction(index), limit_(limit), globalDataOffset_(globalDataOffset)
     {
         setResultType(MIRType::Pointer);
     }
 
-    bool hasLimit_;
     uint32_t limit_;
-    bool alwaysThrow_;
     unsigned globalDataOffset_;
 
   public:
     INSTRUCTION_HEADER(AsmJSLoadFuncPtr)
 
+    static const uint32_t NoLimit = UINT32_MAX;
+
     static MAsmJSLoadFuncPtr* New(TempAllocator& alloc, MDefinition* index, uint32_t limit,
-                                  bool alwaysThrow, unsigned globalDataOffset)
+                                  unsigned globalDataOffset)
     {
-        return new(alloc) MAsmJSLoadFuncPtr(index, true, limit, alwaysThrow, globalDataOffset);
+        MOZ_ASSERT(limit != NoLimit);
+        return new(alloc) MAsmJSLoadFuncPtr(index, limit, globalDataOffset);
     }
 
     static MAsmJSLoadFuncPtr* New(TempAllocator& alloc, MDefinition* index,
                                   unsigned globalDataOffset)
     {
-        return new(alloc) MAsmJSLoadFuncPtr(index, false, 0, false, globalDataOffset);
+        return new(alloc) MAsmJSLoadFuncPtr(index, NoLimit, globalDataOffset);
     }
 
     MDefinition* index() const { return getOperand(0); }
-    bool hasLimit() const { return hasLimit_; }
-    uint32_t limit() const { MOZ_ASSERT(hasLimit_); return limit_; }
-    bool alwaysThrow() const { return alwaysThrow_; }
+    bool hasLimit() const { return limit_ != NoLimit; }
+    uint32_t limit() const { MOZ_ASSERT(hasLimit()); return limit_; }
     unsigned globalDataOffset() const { return globalDataOffset_; }
 
     HashNumber valueHash() const override;
@@ -14575,22 +14651,52 @@ class MAsmJSCall final
     class Callee {
       public:
         enum Which { Internal, Dynamic, Builtin };
+        static const uint32_t NoSigIndex = UINT32_MAX;
       private:
         Which which_;
         union {
-            AsmJSInternalCallee internal_;
-            MDefinition* dynamic_;
+            uint32_t internal_;
+            struct {
+                MDefinition* callee_;
+                uint32_t sigIndex_;
+            } dynamic;
             wasm::SymbolicAddress builtin_;
         } u;
       public:
         Callee() {}
-        explicit Callee(AsmJSInternalCallee callee) : which_(Internal) { u.internal_ = callee; }
-        explicit Callee(MDefinition* callee) : which_(Dynamic) { u.dynamic_ = callee; }
-        explicit Callee(wasm::SymbolicAddress callee) : which_(Builtin) { u.builtin_ = callee; }
-        Which which() const { return which_; }
-        AsmJSInternalCallee internal() const { MOZ_ASSERT(which_ == Internal); return u.internal_; }
-        MDefinition* dynamic() const { MOZ_ASSERT(which_ == Dynamic); return u.dynamic_; }
-        wasm::SymbolicAddress builtin() const { MOZ_ASSERT(which_ == Builtin); return u.builtin_; }
+        explicit Callee(uint32_t callee) : which_(Internal) {
+            u.internal_ = callee;
+        }
+        explicit Callee(MDefinition* callee, uint32_t sigIndex = NoSigIndex) : which_(Dynamic) {
+            u.dynamic.callee_ = callee;
+            u.dynamic.sigIndex_ = sigIndex;
+        }
+        explicit Callee(wasm::SymbolicAddress callee) : which_(Builtin) {
+            u.builtin_ = callee;
+        }
+        Which which() const {
+            return which_;
+        }
+        uint32_t internal() const {
+            MOZ_ASSERT(which_ == Internal);
+            return u.internal_;
+        }
+        MDefinition* dynamicPtr() const {
+            MOZ_ASSERT(which_ == Dynamic);
+            return u.dynamic.callee_;
+        }
+        bool dynamicHasSigIndex() const {
+            MOZ_ASSERT(which_ == Dynamic);
+            return u.dynamic.sigIndex_ != NoSigIndex;
+        }
+        uint32_t dynamicSigIndex() const {
+            MOZ_ASSERT(dynamicHasSigIndex());
+            return u.dynamic.sigIndex_;
+        }
+        wasm::SymbolicAddress builtin() const {
+            MOZ_ASSERT(which_ == Builtin);
+            return u.builtin_;
+        }
     };
 
   private:

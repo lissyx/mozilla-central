@@ -1465,6 +1465,12 @@ HTMLMediaElement::FastSeek(double aTime, ErrorResult& aRv)
 }
 
 void
+HTMLMediaElement::SeekToNextFrame(ErrorResult& aRv)
+{
+  Seek(CurrentTime(), SeekTarget::NextFrame, aRv);
+}
+
+void
 HTMLMediaElement::SetCurrentTime(double aCurrentTime, ErrorResult& aRv)
 {
   Seek(aCurrentTime, SeekTarget::Accurate, aRv);
@@ -1870,7 +1876,8 @@ void HTMLMediaElement::SetVolumeInternal()
     }
   }
 
-  UpdateAudioChannelPlayingState();
+  NotifyAudioPlaybackChanged(
+    AudioChannelService::AudibleChangedReasons::eVolumeChanged);
 }
 
 NS_IMETHODIMP HTMLMediaElement::SetMuted(bool aMuted)
@@ -2275,7 +2282,8 @@ HTMLMediaElement::HTMLMediaElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
     mHasUserInteraction(false),
     mFirstFrameLoaded(false),
     mDefaultPlaybackStartPosition(0.0),
-    mIsAudioTrackAudible(false)
+    mIsAudioTrackAudible(false),
+    mAudible(IsAudible())
 {
   mAudioChannel = AudioChannelService::GetDefaultAudioChannel();
 
@@ -2323,20 +2331,6 @@ HTMLMediaElement::~HTMLMediaElement()
   }
 
   WakeLockRelease();
-}
-
-void
-HTMLMediaElement::GetItemValueText(DOMString& aValue)
-{
-  // Can't call GetSrc because we don't have a JSContext
-  GetURIAttr(nsGkAtoms::src, nullptr, aValue);
-}
-
-void
-HTMLMediaElement::SetItemValueText(const nsAString& aValue)
-{
-  // Can't call SetSrc because we don't have a JSContext
-  SetAttr(kNameSpaceID_None, nsGkAtoms::src, aValue, true);
 }
 
 void HTMLMediaElement::StopSuspendingAfterFirstFrame()
@@ -4977,8 +4971,8 @@ HTMLMediaElement::IsPlayingThroughTheAudioChannel() const
     return true;
   }
 
-  // Are we paused or muted
-  if (mPaused || Muted()) {
+  // Are we paused
+  if (mPaused) {
     return false;
   }
 
@@ -4989,11 +4983,6 @@ HTMLMediaElement::IsPlayingThroughTheAudioChannel() const
 
   // If this element doesn't have any audio tracks.
   if (!HasAudio()) {
-    return false;
-  }
-
-  // The volume should not be ~0
-  if (std::fabs(Volume()) <= 1e-7) {
     return false;
   }
 
@@ -5061,7 +5050,7 @@ HTMLMediaElement::NotifyAudioChannelAgent(bool aPlaying)
     // any sound.
     AudioPlaybackConfig config;
     nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(&config,
-                                                           mIsAudioTrackAudible);
+                                                           IsAudible());
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return;
     }
@@ -5114,6 +5103,7 @@ HTMLMediaElement::WindowSuspendChanged(SuspendTypes aSuspend)
       BlockByAudioChannel();
       break;
     case nsISuspendedTypes::SUSPENDED_STOP_DISPOSABLE:
+      SetAudioChannelSuspended(nsISuspendedTypes::NONE_SUSPENDED);
       Pause();
       break;
     default:
@@ -5121,6 +5111,9 @@ HTMLMediaElement::WindowSuspendChanged(SuspendTypes aSuspend)
              ("HTMLMediaElement, WindowSuspendChanged, this = %p, "
               "Error : unknown suspended type!\n", this));
   }
+
+  NotifyAudioPlaybackChanged(
+    AudioChannelService::AudibleChangedReasons::ePauseStateChanged);
 
   return NS_OK;
 }
@@ -5617,16 +5610,45 @@ HTMLMediaElement::SetAudibleState(bool aAudible)
 {
   if (mIsAudioTrackAudible != aAudible) {
     mIsAudioTrackAudible = aAudible;
-    NotifyAudioPlaybackChanged();
+    NotifyAudioPlaybackChanged(
+      AudioChannelService::AudibleChangedReasons::eDataAudibleChanged);
   }
 }
 
 void
-HTMLMediaElement::NotifyAudioPlaybackChanged()
+HTMLMediaElement::NotifyAudioPlaybackChanged(AudibleChangedReasons aReason)
 {
-  if (mAudioChannelAgent) {
-    mAudioChannelAgent->NotifyStartedAudible(mIsAudioTrackAudible);
+  if (!mAudioChannelAgent) {
+    return;
   }
+
+  if (mAudible == IsAudible()) {
+    return;
+  }
+
+  mAudible = IsAudible();
+  mAudioChannelAgent->NotifyStartedAudible(mAudible, aReason);
+}
+
+bool
+HTMLMediaElement::IsAudible() const
+{
+  // Muted or the volume should not be ~0
+  if (Muted() || (std::fabs(Volume()) <= 1e-7)) {
+    return false;
+  }
+
+  // No sound can be heard during suspending.
+  if (IsSuspendedByAudioChannel()) {
+    return false;
+  }
+
+  // Silent audio track.
+  if (!mIsAudioTrackAudible) {
+    return false;
+  }
+
+  return true;
 }
 
 } // namespace dom

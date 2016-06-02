@@ -297,12 +297,12 @@ public:
 
 NS_IMPL_ISUPPORTS(GPUAdapterReporter, nsIMemoryReporter)
 
+Atomic<size_t> gfxWindowsPlatform::sD3D11SharedTextures;
+Atomic<size_t> gfxWindowsPlatform::sD3D9SharedTextures;
 
-Atomic<size_t> gfxWindowsPlatform::sD3D11MemoryUsed;
-
-class D3D11TextureReporter final : public nsIMemoryReporter
+class D3DSharedTexturesReporter final : public nsIMemoryReporter
 {
-  ~D3D11TextureReporter() {}
+  ~D3DSharedTexturesReporter() {}
 
 public:
   NS_DECL_ISUPPORTS
@@ -310,53 +310,29 @@ public:
   NS_IMETHOD CollectReports(nsIHandleReportCallback *aHandleReport,
                             nsISupports* aData, bool aAnonymize) override
   {
-      return MOZ_COLLECT_REPORT("d3d11-shared-textures", KIND_OTHER, UNITS_BYTES,
-                                gfxWindowsPlatform::sD3D11MemoryUsed,
-                                "Memory used for D3D11 shared textures");
+    nsresult rv;
+
+    if (gfxWindowsPlatform::sD3D11SharedTextures > 0) {
+      rv = MOZ_COLLECT_REPORT(
+        "d3d11-shared-textures", KIND_OTHER, UNITS_BYTES,
+        gfxWindowsPlatform::sD3D11SharedTextures,
+        "D3D11 shared textures.");
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+
+    if (gfxWindowsPlatform::sD3D9SharedTextures > 0) {
+      rv = MOZ_COLLECT_REPORT(
+        "d3d9-shared-textures", KIND_OTHER, UNITS_BYTES,
+        gfxWindowsPlatform::sD3D9SharedTextures,
+        "D3D9 shared textures.");
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+
+    return NS_OK;
   }
 };
 
-NS_IMPL_ISUPPORTS(D3D11TextureReporter, nsIMemoryReporter)
-
-Atomic<size_t> gfxWindowsPlatform::sD3D9MemoryUsed;
-
-class D3D9TextureReporter final : public nsIMemoryReporter
-{
-  ~D3D9TextureReporter() {}
-
-public:
-  NS_DECL_ISUPPORTS
-
-  NS_IMETHOD CollectReports(nsIHandleReportCallback *aHandleReport,
-                            nsISupports* aData, bool aAnonymize) override
-  {
-    return MOZ_COLLECT_REPORT("d3d9-shared-textures", KIND_OTHER, UNITS_BYTES,
-                              gfxWindowsPlatform::sD3D9MemoryUsed,
-                              "Memory used for D3D9 shared textures");
-  }
-};
-
-NS_IMPL_ISUPPORTS(D3D9TextureReporter, nsIMemoryReporter)
-
-Atomic<size_t> gfxWindowsPlatform::sD3D9SharedTextureUsed;
-
-class D3D9SharedTextureReporter final : public nsIMemoryReporter
-{
-  ~D3D9SharedTextureReporter() {}
-
-public:
-  NS_DECL_ISUPPORTS
-
-  NS_IMETHOD CollectReports(nsIHandleReportCallback *aHandleReport,
-                            nsISupports* aData, bool aAnonymize) override
-  {
-    return MOZ_COLLECT_REPORT("d3d9-shared-texture", KIND_OTHER, UNITS_BYTES,
-                              gfxWindowsPlatform::sD3D9SharedTextureUsed,
-                              "Memory used for D3D9 shared textures");
-  }
-};
-
-NS_IMPL_ISUPPORTS(D3D9SharedTextureReporter, nsIMemoryReporter)
+NS_IMPL_ISUPPORTS(D3DSharedTexturesReporter, nsIMemoryReporter)
 
 gfxWindowsPlatform::gfxWindowsPlatform()
   : mRenderMode(RENDER_GDI)
@@ -376,11 +352,8 @@ gfxWindowsPlatform::gfxWindowsPlatform()
   CoInitialize(nullptr); 
 
   RegisterStrongMemoryReporter(new GfxD2DVramReporter());
-
   RegisterStrongMemoryReporter(new GPUAdapterReporter());
-  RegisterStrongMemoryReporter(new D3D11TextureReporter());
-  RegisterStrongMemoryReporter(new D3D9TextureReporter());
-  RegisterStrongMemoryReporter(new D3D9SharedTextureReporter());
+  RegisterStrongMemoryReporter(new D3DSharedTexturesReporter());
 }
 
 gfxWindowsPlatform::~gfxWindowsPlatform()
@@ -400,6 +373,14 @@ gfxWindowsPlatform::~gfxWindowsPlatform()
   CoUninitialize();
 }
 
+static void
+UpdateANGLEConfig()
+{
+  if (!gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING)) {
+    gfxConfig::Disable(Feature::D3D11_HW_ANGLE, FeatureStatus::Disabled, "D3D11 compositing is disabled");
+  }
+}
+
 void
 gfxWindowsPlatform::InitAcceleration()
 {
@@ -416,6 +397,7 @@ gfxWindowsPlatform::InitAcceleration()
 
   InitializeConfig();
   InitializeDevices();
+  UpdateANGLEConfig();
   UpdateRenderMode();
 }
 
@@ -482,11 +464,14 @@ gfxWindowsPlatform::HandleDeviceReset()
   mCompositorD3D11TextureSharingWorks = false;
   mDeviceResetReason = DeviceResetReason::OK;
 
-  imgLoader::Singleton()->ClearCache(true);
-  imgLoader::Singleton()->ClearCache(false);
+  imgLoader::NormalLoader()->ClearCache(true);
+  imgLoader::NormalLoader()->ClearCache(false);
+  imgLoader::PrivateBrowsingLoader()->ClearCache(true);
+  imgLoader::PrivateBrowsingLoader()->ClearCache(false);
   gfxAlphaBoxBlur::ShutdownBlurCache();
 
   InitializeDevices();
+  UpdateANGLEConfig();
   BumpDeviceCounter();
   return true;
 }
@@ -1947,6 +1932,25 @@ IsWARPStable()
   return true;
 }
 
+static void
+InitializeANGLEConfig()
+{
+  FeatureState& d3d11ANGLE = gfxConfig::GetFeature(Feature::D3D11_HW_ANGLE);
+
+  if (!gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING)) {
+    d3d11ANGLE.DisableByDefault(FeatureStatus::Unavailable, "D3D11 compositing is disabled");
+    return;
+  }
+
+  d3d11ANGLE.EnableByDefault();
+
+  nsCString message;
+  if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, &message)) {
+    d3d11ANGLE.Disable(FeatureStatus::Blacklisted, message.get());
+  }
+
+}
+
 void
 gfxWindowsPlatform::InitializeConfig()
 {
@@ -1957,6 +1961,7 @@ gfxWindowsPlatform::InitializeConfig()
 
   InitializeD3D9Config();
   InitializeD3D11Config();
+  InitializeANGLEConfig();
   InitializeD2DConfig();
 }
 
@@ -2060,6 +2065,9 @@ gfxWindowsPlatform::UpdateDeviceInitData()
     FeatureStatus::Disabled,
     "Disabled by parent process");
 
+
+  InitializeANGLEConfig();
+
   return true;
 }
 
@@ -2124,13 +2132,13 @@ gfxWindowsPlatform::AttemptD3D11DeviceCreation(FeatureState& d3d11)
   mCompositorD3D11TextureSharingWorks = ::DoesD3D11TextureSharingWork(mD3D11Device);
 
   if (!mCompositorD3D11TextureSharingWorks) {
-    gfxConfig::SetFailed(Feature::D3D11_ANGLE,
+    gfxConfig::SetFailed(Feature::D3D11_HW_ANGLE,
                          FeatureStatus::Broken,
                          "Texture sharing doesn't work");
   }
 
   if (DoesRenderTargetViewNeedsRecreating(mD3D11Device)) {
-    gfxConfig::SetFailed(Feature::D3D11_ANGLE,
+    gfxConfig::SetFailed(Feature::D3D11_HW_ANGLE,
                          FeatureStatus::Broken,
                          "RenderTargetViews need recreating");
   }
@@ -2378,12 +2386,6 @@ gfxWindowsPlatform::InitializeDevices()
   // First, initialize D3D11. If this succeeds we attempt to use Direct2D.
   InitializeD3D11();
   InitializeD2D();
-
-  if (!gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING)) {
-    gfxConfig::DisableByDefault(Feature::D3D11_ANGLE, FeatureStatus::Disabled, "D3D11 compositing is disabled");
-  } else {
-    gfxConfig::EnableByDefault(Feature::D3D11_ANGLE);
-  }
 
   if (!gfxConfig::IsEnabled(Feature::DIRECT2D)) {
     if (XRE_IsContentProcess() && GetParentDevicePrefs().useD2D1()) {

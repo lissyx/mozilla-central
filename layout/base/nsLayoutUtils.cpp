@@ -113,6 +113,7 @@
 #include "mozilla/RuleNodeCacheConditions.h"
 #include "mozilla/StyleSetHandle.h"
 #include "mozilla/StyleSetHandleInlines.h"
+#include "RegionBuilder.h"
 
 #ifdef MOZ_XUL
 #include "nsXULPopupManager.h"
@@ -238,13 +239,15 @@ WebkitPrefixEnabledPrefChangeCallback(const char* aPrefName, void* aClosure)
 
   static int32_t sIndexOfWebkitBoxInDisplayTable;
   static int32_t sIndexOfWebkitInlineBoxInDisplayTable;
-  static bool sAreWebkitBoxKeywordIndicesInitialized; // initialized to false
+  static int32_t sIndexOfWebkitFlexInDisplayTable;
+  static int32_t sIndexOfWebkitInlineFlexInDisplayTable;
+
+  static bool sAreKeywordIndicesInitialized; // initialized to false
 
   bool isWebkitPrefixSupportEnabled =
     Preferences::GetBool(WEBKIT_PREFIXES_ENABLED_PREF_NAME, false);
-  if (!sAreWebkitBoxKeywordIndicesInitialized) {
-    // First run: find the position of "-webkit-box" and "-webkit-inline-box"
-    // in kDisplayKTable.
+  if (!sAreKeywordIndicesInitialized) {
+    // First run: find the position of the keywords in kDisplayKTable.
     sIndexOfWebkitBoxInDisplayTable =
       nsCSSProps::FindIndexOfKeyword(eCSSKeyword__webkit_box,
                                      nsCSSProps::kDisplayKTable);
@@ -255,11 +258,23 @@ WebkitPrefixEnabledPrefChangeCallback(const char* aPrefName, void* aClosure)
                                      nsCSSProps::kDisplayKTable);
     MOZ_ASSERT(sIndexOfWebkitInlineBoxInDisplayTable >= 0,
                "Couldn't find -webkit-inline-box in kDisplayKTable");
-    sAreWebkitBoxKeywordIndicesInitialized = true;
+
+    sIndexOfWebkitFlexInDisplayTable =
+      nsCSSProps::FindIndexOfKeyword(eCSSKeyword__webkit_flex,
+                                     nsCSSProps::kDisplayKTable);
+    MOZ_ASSERT(sIndexOfWebkitFlexInDisplayTable >= 0,
+               "Couldn't find -webkit-flex in kDisplayKTable");
+    sIndexOfWebkitInlineFlexInDisplayTable =
+      nsCSSProps::FindIndexOfKeyword(eCSSKeyword__webkit_inline_flex,
+                                     nsCSSProps::kDisplayKTable);
+    MOZ_ASSERT(sIndexOfWebkitInlineFlexInDisplayTable >= 0,
+               "Couldn't find -webkit-inline-flex in kDisplayKTable");
+    sAreKeywordIndicesInitialized = true;
   }
 
-  // OK -- now, stomp on or restore the "-webkit-box" entries in kDisplayKTable,
-  // depending on whether the webkit prefix pref is enabled vs. disabled.
+  // OK -- now, stomp on or restore the "-webkit-{box|flex}" entries in
+  // kDisplayKTable, depending on whether the webkit prefix pref is enabled
+  // vs. disabled.
   if (sIndexOfWebkitBoxInDisplayTable >= 0) {
     nsCSSProps::kDisplayKTable[sIndexOfWebkitBoxInDisplayTable].mKeyword =
       isWebkitPrefixSupportEnabled ?
@@ -269,6 +284,16 @@ WebkitPrefixEnabledPrefChangeCallback(const char* aPrefName, void* aClosure)
     nsCSSProps::kDisplayKTable[sIndexOfWebkitInlineBoxInDisplayTable].mKeyword =
       isWebkitPrefixSupportEnabled ?
       eCSSKeyword__webkit_inline_box : eCSSKeyword_UNKNOWN;
+  }
+  if (sIndexOfWebkitFlexInDisplayTable >= 0) {
+    nsCSSProps::kDisplayKTable[sIndexOfWebkitFlexInDisplayTable].mKeyword =
+      isWebkitPrefixSupportEnabled ?
+      eCSSKeyword__webkit_flex : eCSSKeyword_UNKNOWN;
+  }
+  if (sIndexOfWebkitInlineFlexInDisplayTable >= 0) {
+    nsCSSProps::kDisplayKTable[sIndexOfWebkitInlineFlexInDisplayTable].mKeyword =
+      isWebkitPrefixSupportEnabled ?
+      eCSSKeyword__webkit_inline_flex : eCSSKeyword_UNKNOWN;
   }
 }
 
@@ -3456,20 +3481,6 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
       js::ProfileEntry::Category::GRAPHICS);
 
     aFrame->BuildDisplayListForStackingContext(&builder, dirtyRect, &list);
-#ifdef DEBUG
-    if (builder.IsForGenerateGlyphMask() || builder.IsForPaintingSelectionBG()) {
-      // PaintFrame is called to generate text glyph by
-      // nsDisplayBackgroundImage::Paint or nsDisplayBackgroundColor::Paint.
-      //
-      // Assert that we do not generate and put nsDisplayBackgroundImage or
-      // nsDisplayBackgroundColor into the list again, which would lead to
-      // infinite recursion.
-      for (nsDisplayItem* i = list.GetBottom(); i; i = i->GetAbove()) {
-        MOZ_ASSERT(nsDisplayItem::TYPE_BACKGROUND != i->GetType() &&
-                   nsDisplayItem::TYPE_BACKGROUND_COLOR != i->GetType());
-      }
-    }
-#endif
   }
 
   nsIAtom* frameType = aFrame->GetType();
@@ -6667,7 +6678,6 @@ ComputeSnappedImageDrawingParameters(gfxContext*     aCtx,
                                        region, svgViewportSize);
 }
 
-
 static DrawResult
 DrawImageInternal(gfxContext&            aContext,
                   nsPresContext*         aPresContext,
@@ -6909,6 +6919,7 @@ nsLayoutUtils::DrawBackgroundImage(gfxContext&         aContext,
                                    Filter              aGraphicsFilter,
                                    const nsRect&       aDest,
                                    const nsRect&       aFill,
+                                   const nsSize&       aRepeatSize,
                                    const nsPoint&      aAnchor,
                                    const nsRect&       aDirty,
                                    uint32_t            aImageFlags,
@@ -6923,9 +6934,29 @@ nsLayoutUtils::DrawBackgroundImage(gfxContext&         aContext,
 
   SVGImageContext svgContext(aImageSize, Nothing());
 
-  return DrawImageInternal(aContext, aPresContext, aImage,
-                           aGraphicsFilter, aDest, aFill, aAnchor,
-                           aDirty, &svgContext, aImageFlags, aExtendMode);
+  /* Fast path when there is no need for image spacing */
+  if (aRepeatSize.width == aDest.width && aRepeatSize.height == aDest.height) {
+    return DrawImageInternal(aContext, aPresContext, aImage,
+                             aGraphicsFilter, aDest, aFill, aAnchor,
+                             aDirty, &svgContext, aImageFlags, aExtendMode);
+  }
+
+  nsPoint firstTilePos = aDest.TopLeft() +
+                         nsPoint(NSToIntFloor(float(aFill.x - aDest.x) / aRepeatSize.width) * aRepeatSize.width,
+                                 NSToIntFloor(float(aFill.y - aDest.y) / aRepeatSize.height) * aRepeatSize.height);
+  for (int32_t i = firstTilePos.x; i < aFill.XMost(); i += aRepeatSize.width) {
+    for (int32_t j = firstTilePos.y; j < aFill.YMost(); j += aRepeatSize.height) {
+      nsRect dest(i, j, aDest.width, aDest.height);
+      DrawResult result = DrawImageInternal(aContext, aPresContext, aImage, aGraphicsFilter,
+                                            dest, dest, aAnchor, aDirty, &svgContext,
+                                            aImageFlags, ExtendMode::CLAMP);
+      if (result != DrawResult::SUCCESS) {
+        return result;
+      }
+    }
+  }
+
+  return DrawResult::SUCCESS;
 }
 
 /* static */ DrawResult
@@ -9064,14 +9095,14 @@ nsLayoutUtils::TransformToAncestorAndCombineRegions(
     return;
   }
   bool isPrecise;
-  nsRegion transformedRegion;
+  RegionBuilder<nsRegion> transformedRegion;
   for (nsRegion::RectIterator it = aRegion.RectIter(); !it.Done(); it.Next()) {
     nsRect transformed = TransformFrameRectToAncestor(
       aFrame, it.Get(), aAncestorFrame, &isPrecise, aMatrixCache);
     transformedRegion.OrWith(transformed);
   }
   nsRegion* dest = isPrecise ? aPreciseTargetDest : aImpreciseTargetDest;
-  dest->OrWith(transformedRegion);
+  dest->OrWith(transformedRegion.ToRegion());
 }
 
 /* static */ bool
@@ -9261,7 +9292,7 @@ nsLayoutUtils::UpdateDisplayPortMarginsFromPendingMessages() {
     mozilla::dom::ContentChild::GetSingleton()->GetIPCChannel()->PeekMessages(
       [](const IPC::Message& aMsg) -> bool {
         if (aMsg.type() == mozilla::layers::PAPZ::Msg_UpdateFrame__ID) {
-          void* iter = nullptr;
+          PickleIterator iter(aMsg);
           FrameMetrics frame;
           if (!IPC::ReadParam(&aMsg, &iter, &frame)) {
             MOZ_ASSERT(false);

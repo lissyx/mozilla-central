@@ -8,6 +8,7 @@ import android.app.IntentService;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.text.TextUtils;
 import android.util.Log;
 import ch.boye.httpclientandroidlib.HttpHeaders;
 import ch.boye.httpclientandroidlib.HttpResponse;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -44,8 +46,38 @@ public class TelemetryUploadService extends IntentService {
     private static final String LOGTAG = StringUtils.safeSubstring("Gecko" + TelemetryUploadService.class.getSimpleName(), 0, 23);
     private static final String WORKER_THREAD_NAME = LOGTAG + "Worker";
 
+    private static final String ENV_VAR_NAME = "MOZ_DISABLE_TELEMETRY";
+
     public static final String ACTION_UPLOAD = "upload";
     public static final String EXTRA_STORE = "store";
+
+    /**
+     * An override for telemetry via Intents.
+     *
+     * BrowserApp.onCreate, which sets the disabled state, should run before
+     * TelemetryUploadService, so we don't have to synchronize/volatile.
+     */
+    private static Boolean isDisabledByLaunchingIntent = null;
+
+    /**
+     * As a sanity check, this method should only be called once.
+     */
+    public static void setDisabledFromEnvVar(final HashMap<String, String> envVarMap) {
+        if (isDisabledByLaunchingIntent != null) {
+            throw new IllegalStateException("Disabled state already set");
+        }
+        isDisabledByLaunchingIntent = !TextUtils.isEmpty(envVarMap.get(ENV_VAR_NAME));
+        if (isDisabledByLaunchingIntent) {
+            Log.d(LOGTAG, "Telemetry disabled by environment variable: " + ENV_VAR_NAME);
+        }
+    }
+
+    private static boolean isDisabledByLaunchingIntent() {
+        if (isDisabledByLaunchingIntent == null) {
+            throw new IllegalStateException("Disabled state not yet set.");
+        }
+        return isDisabledByLaunchingIntent;
+    }
 
     public TelemetryUploadService() {
         super(WORKER_THREAD_NAME);
@@ -149,6 +181,11 @@ public class TelemetryUploadService extends IntentService {
             return false;
         }
 
+        if (!NetworkUtils.isConnected(context)) {
+            Log.w(LOGTAG, "Network is not connected; returning");
+            return false;
+        }
+
         if (!isIntentValid(intent)) {
             Log.w(LOGTAG, "Received invalid Intent; returning");
             return false;
@@ -167,6 +204,8 @@ public class TelemetryUploadService extends IntentService {
      * {@link #isUploadEnabledByProfileConfig(Context, GeckoProfile)} if the profile is available as it takes into
      * account more information.
      *
+     * You may wish to also check if the network is connected when calling this method.
+     *
      * Note that this method logs debug statements when upload is disabled.
      */
     public static boolean isUploadEnabledByAppConfig(final Context context) {
@@ -175,13 +214,13 @@ public class TelemetryUploadService extends IntentService {
             return false;
         }
 
-        if (!GeckoPreferences.getBooleanPref(context, GeckoPreferences.PREFS_HEALTHREPORT_UPLOAD_ENABLED, true)) {
-            Log.d(LOGTAG, "Telemetry upload opt-out");
+        if (isDisabledByLaunchingIntent()) {
+            Log.d(LOGTAG, "Telemetry upload feature is disabled by intent (in testing?)");
             return false;
         }
 
-        if (!NetworkUtils.isBackgroundDataEnabled(context)) {
-            Log.d(LOGTAG, "Background data is disabled");
+        if (!GeckoPreferences.getBooleanPref(context, GeckoPreferences.PREFS_HEALTHREPORT_UPLOAD_ENABLED, true)) {
+            Log.d(LOGTAG, "Telemetry upload opt-out");
             return false;
         }
 
@@ -191,6 +230,8 @@ public class TelemetryUploadService extends IntentService {
     /**
      * Determines if the telemetry upload feature is enabled via profile & application level configurations. This is the
      * preferred method.
+     *
+     * You may wish to also check if the network is connected when calling this method.
      *
      * Note that this method logs debug statements when upload is disabled.
      */

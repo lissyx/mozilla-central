@@ -9,6 +9,7 @@
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
+#include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/TimeStamp.h"
@@ -591,6 +592,8 @@ gfxPlatform::Init()
     gfxPrefs::GetSingleton();
     MediaPrefs::GetSingleton();
 
+    GPUProcessManager::Initialize();
+
     auto fwd = new CrashStatsLogForwarder("GraphicsCriticalError");
     fwd->SetCircularBufferSize(gfxPrefs::GfxLoggingCrashLength());
 
@@ -705,7 +708,8 @@ gfxPlatform::Init()
     gPlatform->mScreenReferenceDrawTarget =
         gPlatform->CreateOffscreenContentDrawTarget(IntSize(1, 1),
                                                     SurfaceFormat::B8G8R8A8);
-    if (!gPlatform->mScreenReferenceDrawTarget) {
+    if (!gPlatform->mScreenReferenceDrawTarget ||
+        !gPlatform->mScreenReferenceDrawTarget->IsValid()) {
       NS_RUNTIMEABORT("Could not initialize mScreenReferenceDrawTarget");
     }
 
@@ -838,6 +842,8 @@ gfxPlatform::Shutdown()
     // WebGL on Optimus.
     GLContextProviderEGL::Shutdown();
 #endif
+
+    GPUProcessManager::Shutdown();
 
     // This is a bit iffy - we're assuming that we were the ones that set the
     // log forwarder in the Factory, so that it's our responsibility to
@@ -998,9 +1004,6 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
 
   if (!aTarget) {
     aTarget = gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget();
-    if (!aTarget) {
-      return nullptr;
-    }
   }
 
   void *userData = aSurface->GetData(&kSourceSurface);
@@ -2062,7 +2065,6 @@ gfxPlatform::OptimalFormatForContent(gfxContentType aContent)
  * and remember the values.  Changing these preferences during the run will
  * not have any effect until we restart.
  */
-bool gANGLESupportsD3D11 = false;
 static mozilla::Atomic<bool> sLayersSupportsHardwareVideoDecoding(false);
 static bool sLayersHardwareVideoDecodingFailed = false;
 static bool sBufferRotationCheckPref = true;
@@ -2091,15 +2093,6 @@ gfxPlatform::InitAcceleration()
   nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
   nsCString discardFailureId;
   int32_t status;
-#ifdef XP_WIN
-  if (!gfxPrefs::LayersAccelerationDisabledDoNotUseDirectly() && gfxInfo) {
-    if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE, discardFailureId, &status))) {
-      if (status == nsIGfxInfo::FEATURE_STATUS_OK) {
-        gANGLESupportsD3D11 = true;
-      }
-    }
-  }
-#endif
 
   if (Preferences::GetBool("media.hardware-video-decoding.enabled", false) &&
 #ifdef XP_WIN

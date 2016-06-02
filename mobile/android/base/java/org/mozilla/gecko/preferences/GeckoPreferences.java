@@ -356,8 +356,6 @@ OnSharedPreferenceChangeListener
             }
         }
 
-        initActionBar();
-
         // Use setResourceToOpen to specify these extras.
         Bundle intentExtras = getIntent().getExtras();
 
@@ -402,27 +400,6 @@ OnSharedPreferenceChangeListener
             Telemetry.startUISession(TelemetryContract.Session.EXPERIMENT, FeedService.getEnabledExperiment(this));
             Telemetry.sendUIEvent(TelemetryContract.Event.ACTION, Method.BUTTON, "notification-settings");
             Telemetry.stopUISession(TelemetryContract.Session.EXPERIMENT, FeedService.getEnabledExperiment(this));
-        }
-    }
-
-    /**
-     * Initializes the action bar configuration in code.
-     *
-     * Declaring these attributes in XML does not work on some devices for an unknown reason
-     * (e.g. the back button stops working or the logo disappears; see bug 1152314) so we
-     * duplicate those attributes in code here. Note: the order of these calls matters.
-     *
-     * We keep the XML attributes because not all of these methods are available on pre-v14.
-     */
-    private void initActionBar() {
-        if (Versions.feature14Plus) {
-            final ActionBar actionBar = getSupportActionBar();
-            if (actionBar != null) {
-                actionBar.setHomeButtonEnabled(true);
-                actionBar.setDisplayHomeAsUpEnabled(true);
-                actionBar.setLogo(R.drawable.logo);
-                actionBar.setDisplayUseLogoEnabled(true);
-            }
         }
     }
 
@@ -1444,34 +1421,15 @@ OnSharedPreferenceChangeListener
             return screen.findPreference(prefName);
         }
 
-        // Handle v14 TwoStatePreference with backwards compatibility.
-        private static class CheckBoxPrefSetter {
-            public void setBooleanPref(Preference preference, boolean value) {
-                if ((preference instanceof CheckBoxPreference) &&
-                   ((CheckBoxPreference) preference).isChecked() != value) {
-                    ((CheckBoxPreference) preference).setChecked(value);
-                }
-            }
-        }
-
-        private static class TwoStatePrefSetter extends CheckBoxPrefSetter {
-            @Override
-            public void setBooleanPref(Preference preference, boolean value) {
-                if ((preference instanceof TwoStatePreference) &&
-                   ((TwoStatePreference) preference).isChecked() != value) {
-                    ((TwoStatePreference) preference).setChecked(value);
-                }
-            }
-        }
-
         @Override
         public void prefValue(String prefName, final boolean value) {
-            final Preference pref = getField(prefName);
-            final CheckBoxPrefSetter prefSetter = new TwoStatePrefSetter();
+            final TwoStatePreference pref = (TwoStatePreference) getField(prefName);
             ThreadUtils.postToUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    prefSetter.setBooleanPref(pref, value);
+                    if (pref.isChecked() != value) {
+                        pref.setChecked(value);
+                    }
                 }
             });
         }

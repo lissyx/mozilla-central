@@ -1735,8 +1735,13 @@ public:
    *                            the image is a vector image being rendered at
    *                            that size.)
    *   @param aDest             The position and scaled area where one copy of
-   *                            the image should be drawn.
+   *                            the image should be drawn. This area represents
+   *                            the image itself in its correct position as defined
+   *                            with the background-position css property.
    *   @param aFill             The area to be filled with copies of the image.
+   *   @param aRepeatSize       The distance between the positions of two subsequent
+   *                            repeats of the image. Sizes larger than aDest.Size()
+   *                            create gaps between the images.
    *   @param aAnchor           A point in aFill which we will ensure is
    *                            pixel-aligned in the output.
    *   @param aDirty            Pixels outside this area may be skipped.
@@ -1750,6 +1755,7 @@ public:
                                         Filter              aGraphicsFilter,
                                         const nsRect&       aDest,
                                         const nsRect&       aFill,
+                                        const nsSize&       aRepeatSize,
                                         const nsPoint&      aAnchor,
                                         const nsRect&       aDirty,
                                         uint32_t            aImageFlags,
@@ -2221,18 +2227,6 @@ public:
                                         bool clear);
 
   /**
-   * Given a frame with possibly animated content, finds the content node
-   * that contains its animations as well as the frame's pseudo-element type
-   * relative to the resulting content node. Returns true if animated content
-   * was found, otherwise it returns false and the output parameters are
-   * undefined.
-   */
-  static bool GetAnimationContent(const nsIFrame* aFrame,
-                                  nsIContent* &aContentResult,
-                                  mozilla::CSSPseudoElementType
-                                    &aPseudoTypeResult);
-
-  /**
    * Returns true if the frame has current (i.e. running or scheduled-to-run)
    * animations or transitions for the property.
    */
@@ -2318,7 +2312,7 @@ public:
   static bool IsGridTemplateSubgridValueEnabled();
 
   /**
-   * Checks whether support for the CSS text-align (and -moz-text-align-last)
+   * Checks whether support for the CSS text-align (and text-align-last)
    * 'true' value is enabled.
    */
   static bool IsTextAlignUnsafeValueEnabled();

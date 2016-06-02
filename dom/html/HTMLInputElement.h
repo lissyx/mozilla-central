@@ -37,9 +37,12 @@ class EventChainPreVisitor;
 
 namespace dom {
 
+class AfterSetFilesOrDirectoriesRunnable;
 class Date;
+class DispatchChangeEventCallback;
 class File;
 class FileList;
+class GetFilesHelper;
 
 /**
  * A class we use to create a singleton object that is used to keep track of
@@ -106,6 +109,9 @@ class HTMLInputElement final : public nsGenericHTMLFormElementWithState,
                                public nsIDOMNSEditableElement,
                                public nsIConstraintValidation
 {
+  friend class AfterSetFilesOrDirectoriesCallback;
+  friend class DispatchChangeEventCallback;
+
 public:
   using nsIConstraintValidation::GetValidationMessage;
   using nsIConstraintValidation::CheckValidity;
@@ -699,9 +705,21 @@ public:
     SetHTMLBoolAttr(nsGkAtoms::directory, aValue, aRv);
   }
 
+  bool WebkitDirectoryAttr() const
+  {
+    return HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory);
+  }
+
+  void SetWebkitDirectoryAttr(bool aValue, ErrorResult& aRv)
+  {
+    SetHTMLBoolAttr(nsGkAtoms::webkitdirectory, aValue, aRv);
+  }
+
   bool IsFilesAndDirectoriesSupported() const;
 
   already_AddRefed<Promise> GetFilesAndDirectories(ErrorResult& aRv);
+
+  already_AddRefed<Promise> GetFiles(bool aRecursiveFlag, ErrorResult& aRv);
 
   void ChooseDirectory(ErrorResult& aRv);
 
@@ -935,8 +953,16 @@ protected:
 
   /**
    * Called after calling one of the SetFilesOrDirectories() functions.
+   * This method can explore the directory recursively if needed.
    */
   void AfterSetFilesOrDirectories(bool aSetValueChanged);
+  void AfterSetFilesOrDirectoriesInternal(bool aSetValueChanged);
+
+  /**
+   * Recursively explore the directory and populate mFileOrDirectories correctly
+   * for webkitdirectory.
+   */
+  void ExploreDirectoryRecursively(bool aSetValuechanged);
 
   /**
    * Determine whether the editor needs to be initialized explicitly for
@@ -1253,6 +1279,11 @@ protected:
    */
   bool IsPopupBlocked() const;
 
+  GetFilesHelper* GetOrCreateGetFilesHelper(bool aRecursiveFlag,
+                                            ErrorResult& aRv);
+
+  void ClearGetFilesHelpers();
+
   nsCOMPtr<nsIControllers> mControllers;
 
   /*
@@ -1285,6 +1316,9 @@ protected:
    * filename it has to call SetFilesOrDirectories to update this member.
    */
   nsTArray<OwningFileOrDirectory> mFilesOrDirectories;
+
+  RefPtr<GetFilesHelper> mGetFilesRecursiveHelper;
+  RefPtr<GetFilesHelper> mGetFilesNonRecursiveHelper;
 
   /**
    * Hack for bug 1086684: Stash the .value when we're a file picker.

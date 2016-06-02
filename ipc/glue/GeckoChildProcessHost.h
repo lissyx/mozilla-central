@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -196,11 +198,14 @@ private:
                                   base::ProcessArchitecture arch);
 
   bool RunPerformAsyncLaunch(StringVector aExtraOpts=StringVector(),
-			     base::ProcessArchitecture aArch=base::GetCurrentProcessArchitecture());
+                             base::ProcessArchitecture aArch=base::GetCurrentProcessArchitecture());
 
   static void GetPathToBinary(FilePath& exePath);
 
-  void SetChildLogName(const char* varName, const char* origLogName);
+  // The buffer is passed to preserve its lifetime until we are done
+  // with launching the sub-process.
+  void SetChildLogName(const char* varName, const char* origLogName,
+                       nsACString &buffer);
 
   // In between launching the subprocess and handing off its IPC
   // channel, there's a small window of time in which *we* might still

@@ -31,7 +31,7 @@ public:
   TextureMemoryMeasurer(size_t aMemoryUsed)
   {
     mMemoryUsed = aMemoryUsed;
-    gfxWindowsPlatform::sD3D11MemoryUsed += mMemoryUsed;
+    gfxWindowsPlatform::sD3D11SharedTextures += mMemoryUsed;
     mRefCnt = 0;
   }
   STDMETHODIMP_(ULONG) AddRef() {
@@ -57,7 +57,7 @@ public:
   STDMETHODIMP_(ULONG) Release() {
     int refCnt = --mRefCnt;
     if (refCnt == 0) {
-      gfxWindowsPlatform::sD3D11MemoryUsed -= mMemoryUsed;
+      gfxWindowsPlatform::sD3D11SharedTextures -= mMemoryUsed;
       delete this;
     }
     return refCnt;
@@ -687,10 +687,16 @@ DXGITextureHostD3D11::SetCompositor(Compositor* aCompositor)
 bool
 DXGITextureHostD3D11::Lock()
 {
+  if (!mCompositor) {
+    NS_WARNING("no suitable compositor");
+    return false;
+  }
+
   if (!GetDevice()) {
     NS_WARNING("trying to lock a TextureHost without a D3D device");
     return false;
   }
+
   if (!mTextureSource) {
     if (!mTexture && !OpenSharedHandle()) {
       gfxWindowsPlatform::GetPlatform()->ForceDeviceReset(ForcedDeviceResetReason::OPENSHAREDHANDLE);
@@ -804,6 +810,11 @@ DXGIYCbCrTextureHostD3D11::SetCompositor(Compositor* aCompositor)
 bool
 DXGIYCbCrTextureHostD3D11::Lock()
 {
+  if (!mCompositor) {
+    NS_WARNING("no suitable compositor");
+    return false;
+  }
+
   if (!GetDevice()) {
     NS_WARNING("trying to lock a TextureHost without a D3D device");
     return false;
@@ -924,7 +935,7 @@ DataTextureSourceD3D11::Update(DataSourceSurface* aSurface,
 
         void* data = map.mData + map.mStride * rect.y + BytesPerPixel(aSurface->GetFormat()) * rect.x;
 
-        mCompositor->GetDC()->UpdateSubresource(mTexture, 0, &box, data, map.mStride, map.mStride * mSize.height);
+        mCompositor->GetDC()->UpdateSubresource(mTexture, 0, &box, data, map.mStride, map.mStride * rect.height);
       }
     } else {
       mCompositor->GetDC()->UpdateSubresource(mTexture, 0, nullptr, aSurface->GetData(),

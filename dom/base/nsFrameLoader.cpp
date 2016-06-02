@@ -343,6 +343,32 @@ nsFrameLoader::SetIsPrerendered()
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsFrameLoader::MakePrerenderedLoaderActive()
+{
+  MOZ_ASSERT(mIsPrerendered, "This frameloader was not in prerendered mode.");
+
+  mIsPrerendered = false;
+  if (IsRemoteFrame()) {
+    if (!mRemoteBrowser) {
+      NS_WARNING("Missing remote browser.");
+      return NS_ERROR_FAILURE;
+    }
+
+    mRemoteBrowser->SetDocShellIsActive(true);
+  } else {
+    if (!mDocShell) {
+      NS_WARNING("Missing docshell.");
+      return NS_ERROR_FAILURE;
+    }
+
+    nsresult rv = mDocShell->SetIsActive(true);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return NS_OK;
+}
+
 nsresult
 nsFrameLoader::ReallyStartLoading()
 {
@@ -1966,7 +1992,7 @@ nsFrameLoader::MaybeCreateDocShell()
   NS_ENSURE_TRUE(mDocShell, NS_ERROR_FAILURE);
 
   if (mIsPrerendered) {
-    nsresult rv = mDocShell->SetIsPrerendered(true);
+    nsresult rv = mDocShell->SetIsPrerendered();
     NS_ENSURE_SUCCESS(rv,rv);
   }
 
@@ -2342,7 +2368,8 @@ nsFrameLoader::UpdateBaseWindowPositionAndSize(nsSubDocumentFrame *aIFrame)
 
     ScreenIntSize size = aIFrame->GetSubdocumentSize();
 
-    baseWindow->SetPositionAndSize(x, y, size.width, size.height, false);
+    baseWindow->SetPositionAndSize(x, y, size.width, size.height,
+                                   nsIBaseWindow::eDelayResize);
   }
 }
 
@@ -3137,7 +3164,8 @@ nsFrameLoader::RequestNotifyLayerTreeCleared()
 }
 
 NS_IMETHODIMP
-nsFrameLoader::Print(nsIPrintSettings* aPrintSettings,
+nsFrameLoader::Print(uint64_t aOuterWindowID,
+                     nsIPrintSettings* aPrintSettings,
                      nsIWebProgressListener* aProgressListener)
 {
 #if defined(NS_PRINTING)
@@ -3152,26 +3180,23 @@ nsFrameLoader::Print(nsIPrintSettings* aPrintSettings,
       return rv;
     }
 
-    bool success = mRemoteBrowser->SendPrint(printData);
+    bool success = mRemoteBrowser->SendPrint(aOuterWindowID, printData);
     return success ? NS_OK : NS_ERROR_FAILURE;
   }
 
-  if (mDocShell) {
-    nsCOMPtr<nsIContentViewer> viewer;
-    mDocShell->GetContentViewer(getter_AddRefs(viewer));
-    if (!viewer) {
-      return NS_ERROR_FAILURE;
-    }
-
-    nsCOMPtr<nsIWebBrowserPrint> webBrowserPrint = do_QueryInterface(viewer);
-    if (!webBrowserPrint) {
-      return NS_ERROR_FAILURE;
-    }
-
-    return webBrowserPrint->Print(aPrintSettings, aProgressListener);
+  nsGlobalWindow* outerWindow =
+    nsGlobalWindow::GetOuterWindowWithId(aOuterWindowID);
+  if (NS_WARN_IF(!outerWindow)) {
+    return NS_ERROR_FAILURE;
   }
 
-  return NS_ERROR_FAILURE;
+  nsCOMPtr<nsIWebBrowserPrint> webBrowserPrint =
+    do_GetInterface(outerWindow->AsOuter());
+  if (NS_WARN_IF(!webBrowserPrint)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return webBrowserPrint->Print(aPrintSettings, aProgressListener);
 #endif
   return NS_OK;
 }
@@ -3361,12 +3386,19 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
     attrs.mUserContextId = userContextId;
   }
 
+  nsAutoString presentationURLStr;
+  mOwnerContent->GetAttr(kNameSpaceID_None,
+                         nsGkAtoms::mozpresentation,
+                         presentationURLStr);
+
   bool tabContextUpdated =
     aTabContext->SetTabContext(OwnerIsMozBrowserFrame(),
+                               mIsPrerendered,
                                ownApp,
                                containingApp,
                                attrs,
-                               signedPkgOrigin);
+                               signedPkgOrigin,
+                               presentationURLStr);
   NS_ENSURE_STATE(tabContextUpdated);
 
   return NS_OK;

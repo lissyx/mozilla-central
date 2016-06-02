@@ -262,6 +262,8 @@
 @BINPATH@/components/zipwriter.xpt
 
 ; JavaScript components
+@BINPATH@/components/nsNetworkInfoService.manifest
+@BINPATH@/components/nsNetworkInfoService.js
 @BINPATH@/components/ChromeNotifications.js
 @BINPATH@/components/ChromeNotifications.manifest
 @BINPATH@/components/ConsoleAPI.manifest
@@ -412,7 +414,7 @@
 @BINPATH@/components/PresentationDeviceInfoManager.manifest
 @BINPATH@/components/PresentationDeviceInfoManager.js
 @BINPATH@/components/BuiltinProviders.manifest
-@BINPATH@/components/TCPPresentationServer.js
+@BINPATH@/components/PresentationControlService.js
 @BINPATH@/components/PresentationNetworkHelper.js
 @BINPATH@/components/PresentationNetworkHelper.manifest
 @BINPATH@/components/PresentationDataChannelSessionTransport.js

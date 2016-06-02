@@ -682,7 +682,7 @@ struct LengthPercentPairCalcOps : public css::NumbersAlreadyNormalizedOps
 };
 
 static void
-SpecifiedCalcToComputedCalc(const nsCSSValue& aValue, nsStyleCoord& aCoord, 
+SpecifiedCalcToComputedCalc(const nsCSSValue& aValue, nsStyleCoord& aCoord,
                             nsStyleContext* aStyleContext,
                             RuleNodeCacheConditions& aConditions)
 {
@@ -966,7 +966,7 @@ SetPairCoords(const nsCSSValue& aValue,
 
   bool cX = SetCoord(valX, aCoordX, aParentX, aMask, aStyleContext,
                        aPresContext, aConditions);
-  mozilla::DebugOnly<bool> cY = SetCoord(valY, aCoordY, aParentY, aMask, 
+  mozilla::DebugOnly<bool> cY = SetCoord(valY, aCoordY, aParentY, aMask,
                        aStyleContext, aPresContext, aConditions);
   MOZ_ASSERT(cX == cY, "changed one but not the other");
   return cX;
@@ -1245,11 +1245,9 @@ static void SetStyleImage(nsStyleContext* aStyleContext,
     case eCSSUnit_Gradient:
     {
       nsStyleGradient* gradient = new nsStyleGradient();
-      if (gradient) {
-        SetGradient(aValue, aStyleContext->PresContext(), aStyleContext,
-                    *gradient, aConditions);
-        aResult.SetGradientData(gradient);
-      }
+      SetGradient(aValue, aStyleContext->PresContext(), aStyleContext,
+                  *gradient, aConditions);
+      aResult.SetGradientData(gradient);
       break;
     }
     case eCSSUnit_Element:
@@ -1259,13 +1257,25 @@ static void SetStyleImage(nsStyleContext* aStyleContext,
     case eCSSUnit_Unset:
     case eCSSUnit_None:
       break;
-    default:
-      // We might have eCSSUnit_URL values for if-visited style
-      // contexts, which we can safely treat like 'none'.  Otherwise
-      // this is an unexpected unit.
-      NS_ASSERTION(aStyleContext->IsStyleIfVisited() &&
-                   aValue.GetUnit() == eCSSUnit_URL,
+    case eCSSUnit_URL:
+    {
+#ifdef DEBUG
+      nsIDocument* currentDoc = aStyleContext->PresContext()->Document();
+      nsIURI* docURI = currentDoc->GetDocumentURI();
+      nsIURI* imageURI = aValue.GetURLValue();
+      bool isEqualExceptRef = false;
+      imageURI->EqualsExceptRef(docURI, &isEqualExceptRef);
+      // Either we have eCSSUnit_URL values for if-visited style contexts,
+      // which we can safely treat like 'none', or aValue refers to an
+      // in-document resource. Otherwise this is an unexpected unit.
+      NS_ASSERTION(aStyleContext->IsStyleIfVisited() || isEqualExceptRef,
                    "unexpected unit; maybe nsCSSValue::Image::Image() failed?");
+#endif
+
+      break;
+    }
+    default:
+      MOZ_ASSERT_UNREACHABLE("Unexpected Unit type.");
       break;
   }
 }
@@ -2858,8 +2868,8 @@ nsRuleNode::CalcFontPointSize(int32_t aHTMLSize, int32_t aBasePointSize,
                               nsPresContext* aPresContext,
                               nsFontSizeType aFontSizeType)
 {
-#define sFontSizeTableMin  9 
-#define sFontSizeTableMax 16 
+#define sFontSizeTableMin  9
+#define sFontSizeTableMax 16
 
 // This table seems to be the one used by MacIE5. We hope its adoption in Mozilla
 // and eventually in WinIE5.5 will help to establish a standard rendering across
@@ -2987,7 +2997,7 @@ nsRuleNode::CalcFontPointSize(int32_t aHTMLSize, int32_t aBasePointSize,
 //------------------------------------------------------------------------------
 
 /* static */ nscoord
-nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize, 
+nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
                                     nsPresContext* aPresContext,
                                     nsFontSizeType aFontSizeType)
 {
@@ -3011,9 +3021,9 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
     indexMin = 0;
     indexMax = 6;
   }
-  
+
   smallestIndexFontSize = CalcFontPointSize(indexMin, aBasePointSize, aPresContext, aFontSizeType);
-  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType); 
+  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType);
   if (aFontSize > smallestIndexFontSize) {
     if (aFontSize < NSToCoordRound(float(largestIndexFontSize) * 1.5)) { // smaller will be in HTML table
       // find largest index smaller than current
@@ -3021,7 +3031,7 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
         indexFontSize = CalcFontPointSize(index, aBasePointSize, aPresContext, aFontSizeType);
         if (indexFontSize < aFontSize)
           break;
-      } 
+      }
       // set up points beyond table for interpolation purposes
       if (indexFontSize == smallestIndexFontSize) {
         smallerIndexFontSize = indexFontSize - onePx;
@@ -3034,9 +3044,9 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
         largerIndexFontSize = CalcFontPointSize(index+1, aBasePointSize, aPresContext, aFontSizeType);
       }
       // compute the relative position of the parent size between the two closest indexed sizes
-      relativePosition = float(aFontSize - indexFontSize) / float(largerIndexFontSize - indexFontSize);            
+      relativePosition = float(aFontSize - indexFontSize) / float(largerIndexFontSize - indexFontSize);
       // set the new size to have the same relative position between the next smallest two indexed sizes
-      smallerSize = smallerIndexFontSize + NSToCoordRound(relativePosition * (indexFontSize - smallerIndexFontSize));      
+      smallerSize = smallerIndexFontSize + NSToCoordRound(relativePosition * (indexFontSize - smallerIndexFontSize));
     }
     else {  // larger than HTML table, drop by 33%
       smallerSize = NSToCoordRound(float(aFontSize) / 1.5);
@@ -3053,7 +3063,7 @@ nsRuleNode::FindNextSmallerFontSize(nscoord aFontSize, int32_t aBasePointSize,
 //------------------------------------------------------------------------------
 
 /* static */ nscoord
-nsRuleNode::FindNextLargerFontSize(nscoord aFontSize, int32_t aBasePointSize, 
+nsRuleNode::FindNextLargerFontSize(nscoord aFontSize, int32_t aBasePointSize,
                                    nsPresContext* aPresContext,
                                    nsFontSizeType aFontSizeType)
 {
@@ -3078,13 +3088,13 @@ nsRuleNode::FindNextLargerFontSize(nscoord aFontSize, int32_t aBasePointSize,
     indexMin = 0;
     indexMax = 6;
   }
-  
+
   smallestIndexFontSize = CalcFontPointSize(indexMin, aBasePointSize, aPresContext, aFontSizeType);
-  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType); 
+  largestIndexFontSize = CalcFontPointSize(indexMax, aBasePointSize, aPresContext, aFontSizeType);
   if (aFontSize > (smallestIndexFontSize - onePx)) {
     if (aFontSize < largestIndexFontSize) { // larger will be in HTML table
       // find smallest index larger than current
-      for (index = indexMin; index <= indexMax; index++) { 
+      for (index = indexMin; index <= indexMax; index++) {
         indexFontSize = CalcFontPointSize(index, aBasePointSize, aPresContext, aFontSizeType);
         if (indexFontSize > aFontSize)
           break;
@@ -4559,11 +4569,11 @@ nsRuleNode::ComputeTextData(void* aStartStruct,
              aContext, mPresContext, conditions);
   }
 
-  // word-wrap: enum, inherit, initial
-  SetDiscrete(*aRuleData->ValueForWordWrap(), text->mWordWrap, conditions,
+  // overflow-wrap: enum, inherit, initial
+  SetDiscrete(*aRuleData->ValueForOverflowWrap(), text->mOverflowWrap, conditions,
               SETDSC_ENUMERATED | SETDSC_UNSET_INHERIT,
-              parentText->mWordWrap,
-              NS_STYLE_WORDWRAP_NORMAL, 0, 0, 0, 0);
+              parentText->mOverflowWrap,
+              NS_STYLE_OVERFLOWWRAP_NORMAL, 0, 0, 0, 0);
 
   // hyphens: enum, inherit, initial
   SetDiscrete(*aRuleData->ValueForHyphens(), text->mHyphens, conditions,
@@ -6311,7 +6321,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
     NS_ASSERTION(result, "Malformed -moz-perspective-origin parse!");
   }
 
-  SetCoord(*aRuleData->ValueForPerspective(), 
+  SetCoord(*aRuleData->ValueForPerspective(),
            display->mChildPerspective, parentDisplay->mChildPerspective,
            SETCOORD_LAH | SETCOORD_INITIAL_NONE | SETCOORD_NONE |
              SETCOORD_UNSET_INITIAL,
@@ -6421,7 +6431,7 @@ nsRuleNode::ComputeVisibilityData(void* aStartStruct,
     double angle = array->Item(0).GetAngleValueInRadians();
     visibility->mImageOrientation =
       nsStyleImageOrientation::CreateAsAngleAndFlip(angle, true);
-    
+
   } else if (orientation->GetUnit() == eCSSUnit_Enumerated) {
     switch (orientation->GetIntValue()) {
       case NS_STYLE_IMAGE_ORIENTATION_FLIP:
@@ -6520,6 +6530,10 @@ struct BackgroundItemComputer<nsCSSValuePairList, nsStyleImageLayers::Repeat>
       aComputedValue.mYRepeat = NS_STYLE_IMAGELAYER_REPEAT_REPEAT;
       break;
     default:
+      NS_ASSERTION(value == NS_STYLE_IMAGELAYER_REPEAT_NO_REPEAT ||
+                   value == NS_STYLE_IMAGELAYER_REPEAT_REPEAT ||
+                   value == NS_STYLE_IMAGELAYER_REPEAT_SPACE ||
+                   value == NS_STYLE_IMAGELAYER_REPEAT_ROUND, "Unexpected value");
       aComputedValue.mXRepeat = value;
       hasContraction = false;
       break;
@@ -6538,7 +6552,9 @@ struct BackgroundItemComputer<nsCSSValuePairList, nsStyleImageLayers::Repeat>
     case eCSSUnit_Enumerated:
       value = aSpecifiedValue->mYValue.GetIntValue();
       NS_ASSERTION(value == NS_STYLE_IMAGELAYER_REPEAT_NO_REPEAT ||
-                   value == NS_STYLE_IMAGELAYER_REPEAT_REPEAT, "Unexpected value");
+                   value == NS_STYLE_IMAGELAYER_REPEAT_REPEAT ||
+                   value == NS_STYLE_IMAGELAYER_REPEAT_SPACE ||
+                   value == NS_STYLE_IMAGELAYER_REPEAT_ROUND, "Unexpected value");
       aComputedValue.mYRepeat = value;
       break;
     default:
@@ -6569,7 +6585,8 @@ struct BackgroundItemComputer<nsCSSValueList, nsCOMPtr<nsIURI> >
                            nsCOMPtr<nsIURI>& aComputedValue,
                            RuleNodeCacheConditions& aConditions)
   {
-    if (eCSSUnit_Image == aSpecifiedValue->mValue.GetUnit()) {
+    if (eCSSUnit_Image == aSpecifiedValue->mValue.GetUnit() ||
+        eCSSUnit_URL == aSpecifiedValue->mValue.GetUnit()) {
       aComputedValue = aSpecifiedValue->mValue.GetURLValue();
     } else if (eCSSUnit_Null != aSpecifiedValue->mValue.GetUnit()) {
       aComputedValue = nullptr;
@@ -8583,14 +8600,11 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
               conditions);
 
   // grid-column-gap
-  nsStyleCoord tempCoord;
   if (SetCoord(*aRuleData->ValueForGridColumnGap(),
-               tempCoord, nsStyleCoord(parentPos->mGridColumnGap,
-                                       nsStyleCoord::CoordConstructor),
-               SETCOORD_LH | SETCOORD_INITIAL_ZERO | SETCOORD_CALC_LENGTH_ONLY |
+               pos->mGridColumnGap, parentPos->mGridColumnGap,
+               SETCOORD_LPH | SETCOORD_INITIAL_ZERO | SETCOORD_STORE_CALC |
                SETCOORD_CALC_CLAMP_NONNEGATIVE | SETCOORD_UNSET_INITIAL,
                aContext, mPresContext, conditions)) {
-    pos->mGridColumnGap = tempCoord.GetCoordValue();
   } else {
     MOZ_ASSERT(aRuleData->ValueForGridColumnGap()->GetUnit() == eCSSUnit_Null,
                "unexpected unit");
@@ -8598,12 +8612,10 @@ nsRuleNode::ComputePositionData(void* aStartStruct,
 
   // grid-row-gap
   if (SetCoord(*aRuleData->ValueForGridRowGap(),
-               tempCoord, nsStyleCoord(parentPos->mGridRowGap,
-                                       nsStyleCoord::CoordConstructor),
-               SETCOORD_LH | SETCOORD_INITIAL_ZERO | SETCOORD_CALC_LENGTH_ONLY |
+               pos->mGridRowGap, parentPos->mGridRowGap,
+               SETCOORD_LPH | SETCOORD_INITIAL_ZERO | SETCOORD_STORE_CALC |
                SETCOORD_CALC_CLAMP_NONNEGATIVE | SETCOORD_UNSET_INITIAL,
                aContext, mPresContext, conditions)) {
-    pos->mGridRowGap = tempCoord.GetCoordValue();
   } else {
     MOZ_ASSERT(aRuleData->ValueForGridRowGap()->GetUnit() == eCSSUnit_Null,
                "unexpected unit");
@@ -9376,20 +9388,7 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   case eCSSUnit_Unset:
     conditions.SetUncacheable();
     svg->mStrokeDasharrayFromObject = parentSVG->mStrokeDasharrayFromObject;
-    // only do the copy if weren't already set up by the copy constructor
-    // FIXME Bug 389408: This is broken when aStartStruct is non-null!
-    if (!svg->mStrokeDasharray) {
-      svg->mStrokeDasharrayLength = parentSVG->mStrokeDasharrayLength;
-      if (svg->mStrokeDasharrayLength) {
-        svg->mStrokeDasharray = new nsStyleCoord[svg->mStrokeDasharrayLength];
-        if (svg->mStrokeDasharray)
-          memcpy(svg->mStrokeDasharray,
-                 parentSVG->mStrokeDasharray,
-                 svg->mStrokeDasharrayLength * sizeof(nsStyleCoord));
-        else
-          svg->mStrokeDasharrayLength = 0;
-      }
-    }
+    svg->mStrokeDasharray = parentSVG->mStrokeDasharray;
     break;
 
   case eCSSUnit_Enumerated:
@@ -9397,45 +9396,35 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
                      NS_STYLE_STROKE_PROP_CONTEXT_VALUE,
                "Unknown keyword for stroke-dasharray");
     svg->mStrokeDasharrayFromObject = true;
-    delete [] svg->mStrokeDasharray;
-    svg->mStrokeDasharray = nullptr;
-    svg->mStrokeDasharrayLength = 0;
+    svg->mStrokeDasharray.Clear();
     break;
 
   case eCSSUnit_Initial:
   case eCSSUnit_None:
     svg->mStrokeDasharrayFromObject = false;
-    delete [] svg->mStrokeDasharray;
-    svg->mStrokeDasharray = nullptr;
-    svg->mStrokeDasharrayLength = 0;
+    svg->mStrokeDasharray.Clear();
     break;
 
   case eCSSUnit_List:
   case eCSSUnit_ListDep: {
     svg->mStrokeDasharrayFromObject = false;
-    delete [] svg->mStrokeDasharray;
-    svg->mStrokeDasharray = nullptr;
-    svg->mStrokeDasharrayLength = 0;
+    svg->mStrokeDasharray.Clear();
 
     // count number of values
     const nsCSSValueList *value = strokeDasharrayValue->GetListValue();
-    svg->mStrokeDasharrayLength = ListLength(value);
+    uint32_t strokeDasharrayLength = ListLength(value);
 
-    NS_ASSERTION(svg->mStrokeDasharrayLength != 0, "no dasharray items");
+    MOZ_ASSERT(strokeDasharrayLength != 0, "no dasharray items");
 
-    svg->mStrokeDasharray = new nsStyleCoord[svg->mStrokeDasharrayLength];
+    svg->mStrokeDasharray.SetLength(strokeDasharrayLength);
 
-    if (svg->mStrokeDasharray) {
-      uint32_t i = 0;
-      while (nullptr != value) {
-        SetCoord(value->mValue,
-                 svg->mStrokeDasharray[i++], nsStyleCoord(),
-                 SETCOORD_LP | SETCOORD_FACTOR,
-                 aContext, mPresContext, conditions);
-        value = value->mNext;
-      }
-    } else {
-      svg->mStrokeDasharrayLength = 0;
+    uint32_t i = 0;
+    while (nullptr != value) {
+      SetCoord(value->mValue,
+               svg->mStrokeDasharray[i++], nsStyleCoord(),
+               SETCOORD_LP | SETCOORD_FACTOR,
+               aContext, mPresContext, conditions);
+      value = value->mNext;
     }
     break;
   }
@@ -9522,6 +9511,155 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   COMPUTE_END_INHERITED(SVG, svg)
 }
 
+already_AddRefed<nsStyleBasicShape>
+nsRuleNode::GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
+                                           nsStyleContext* aStyleContext,
+                                           nsPresContext* aPresContext,
+                                           RuleNodeCacheConditions& aConditions)
+{
+  RefPtr<nsStyleBasicShape> basicShape;
+
+  nsCSSValue::Array* shapeFunction = aValue.GetArrayValue();
+  nsCSSKeyword functionName =
+    (nsCSSKeyword)shapeFunction->Item(0).GetIntValue();
+
+  if (functionName == eCSSKeyword_polygon) {
+    MOZ_ASSERT(!basicShape, "did not expect value");
+    basicShape = new nsStyleBasicShape(nsStyleBasicShape::ePolygon);
+    MOZ_ASSERT(shapeFunction->Count() > 1,
+               "polygon has wrong number of arguments");
+    size_t j = 1;
+    if (shapeFunction->Item(j).GetUnit() == eCSSUnit_Enumerated) {
+      basicShape->SetFillRule(shapeFunction->Item(j).GetIntValue());
+      ++j;
+    }
+    const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
+      SETCOORD_STORE_CALC;
+    const nsCSSValuePairList* curPair =
+      shapeFunction->Item(j).GetPairListValue();
+    nsTArray<nsStyleCoord>& coordinates = basicShape->Coordinates();
+    while (curPair) {
+      nsStyleCoord xCoord, yCoord;
+      DebugOnly<bool> didSetCoordX = SetCoord(curPair->mXValue, xCoord,
+                                              nsStyleCoord(), mask,
+                                              aStyleContext, aPresContext,
+                                              aConditions);
+      coordinates.AppendElement(xCoord);
+      MOZ_ASSERT(didSetCoordX, "unexpected x coordinate unit");
+      DebugOnly<bool> didSetCoordY = SetCoord(curPair->mYValue, yCoord,
+                                              nsStyleCoord(), mask,
+                                              aStyleContext, aPresContext,
+                                              aConditions);
+      coordinates.AppendElement(yCoord);
+      MOZ_ASSERT(didSetCoordY, "unexpected y coordinate unit");
+      curPair = curPair->mNext;
+    }
+  } else if (functionName == eCSSKeyword_circle ||
+             functionName == eCSSKeyword_ellipse) {
+    nsStyleBasicShape::Type type = functionName == eCSSKeyword_circle ?
+      nsStyleBasicShape::eCircle :
+      nsStyleBasicShape::eEllipse;
+    MOZ_ASSERT(!basicShape, "did not expect value");
+    basicShape = new nsStyleBasicShape(type);
+    const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
+      SETCOORD_STORE_CALC | SETCOORD_ENUMERATED;
+    size_t count = type == nsStyleBasicShape::eCircle ? 2 : 3;
+    MOZ_ASSERT(shapeFunction->Count() == count + 1,
+               "unexpected arguments count");
+    MOZ_ASSERT(type == nsStyleBasicShape::eCircle ||
+               (shapeFunction->Item(1).GetUnit() == eCSSUnit_Null) ==
+               (shapeFunction->Item(2).GetUnit() == eCSSUnit_Null),
+               "ellipse should have two radii or none");
+    for (size_t j = 1; j < count; ++j) {
+      const nsCSSValue& val = shapeFunction->Item(j);
+      nsStyleCoord radius;
+      if (val.GetUnit() != eCSSUnit_Null) {
+        DebugOnly<bool> didSetRadius = SetCoord(val, radius,
+                                                nsStyleCoord(), mask,
+                                                aStyleContext,
+                                                aPresContext,
+                                                aConditions);
+        MOZ_ASSERT(didSetRadius, "unexpected radius unit");
+      } else {
+        radius.SetIntValue(NS_RADIUS_CLOSEST_SIDE, eStyleUnit_Enumerated);
+      }
+      basicShape->Coordinates().AppendElement(radius);
+    }
+    const nsCSSValue& positionVal = shapeFunction->Item(count);
+    if (positionVal.GetUnit() == eCSSUnit_Array) {
+      ComputePositionValue(aStyleContext, positionVal,
+                           basicShape->GetPosition(),
+                           aConditions);
+    } else {
+      MOZ_ASSERT(positionVal.GetUnit() == eCSSUnit_Null,
+                 "expected no value");
+    }
+  } else if (functionName == eCSSKeyword_inset) {
+    MOZ_ASSERT(!basicShape, "did not expect value");
+    basicShape = new nsStyleBasicShape(nsStyleBasicShape::eInset);
+    MOZ_ASSERT(shapeFunction->Count() == 6,
+               "inset function has wrong number of arguments");
+    MOZ_ASSERT(shapeFunction->Item(1).GetUnit() != eCSSUnit_Null,
+               "no shape arguments defined");
+    const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
+      SETCOORD_STORE_CALC;
+    nsTArray<nsStyleCoord>& coords = basicShape->Coordinates();
+    for (size_t j = 1; j <= 4; ++j) {
+      const nsCSSValue& val = shapeFunction->Item(j);
+      nsStyleCoord inset;
+      // Fill missing values to get 4 at the end.
+      if (val.GetUnit() == eCSSUnit_Null) {
+        if (j == 4) {
+          inset = coords[1];
+        } else {
+          MOZ_ASSERT(j != 1, "first argument not specified");
+          inset = coords[0];
+        }
+      } else {
+        DebugOnly<bool> didSetInset = SetCoord(val, inset,
+                                               nsStyleCoord(), mask,
+                                               aStyleContext, aPresContext,
+                                               aConditions);
+        MOZ_ASSERT(didSetInset, "unexpected inset unit");
+      }
+      coords.AppendElement(inset);
+    }
+
+    nsStyleCorners& insetRadius = basicShape->GetRadius();
+    if (shapeFunction->Item(5).GetUnit() == eCSSUnit_Array) {
+      nsCSSValue::Array* radiiArray = shapeFunction->Item(5).GetArrayValue();
+      NS_FOR_CSS_FULL_CORNERS(corner) {
+        int cx = NS_FULL_TO_HALF_CORNER(corner, false);
+        int cy = NS_FULL_TO_HALF_CORNER(corner, true);
+        const nsCSSValue& radius = radiiArray->Item(corner);
+        nsStyleCoord coordX, coordY;
+        DebugOnly<bool> didSetRadii = SetPairCoords(radius, coordX, coordY,
+                                                    nsStyleCoord(),
+                                                    nsStyleCoord(), mask,
+                                                    aStyleContext,
+                                                    aPresContext,
+                                                    aConditions);
+        MOZ_ASSERT(didSetRadii, "unexpected radius unit");
+        insetRadius.Set(cx, coordX);
+        insetRadius.Set(cy, coordY);
+      }
+    } else {
+      MOZ_ASSERT(shapeFunction->Item(5).GetUnit() == eCSSUnit_Null,
+                 "unexpected value");
+      // Initialize border-radius
+      nsStyleCoord zero;
+      zero.SetCoordValue(0);
+      NS_FOR_CSS_HALF_CORNERS(j) {
+        insetRadius.Set(j, zero);
+      }
+    }
+  } else {
+    NS_NOTREACHED("unexpected basic shape function");
+  }
+
+  return basicShape.forget();
+}
+
 void
 nsRuleNode::SetStyleClipPathToCSSValue(nsStyleClipPath* aStyleClipPath,
                                        const nsCSSValue* aValue,
@@ -9548,143 +9686,8 @@ nsRuleNode::SetStyleClipPathToCSSValue(nsStyleClipPath* aStyleClipPath,
       }
       sizingBox = (uint8_t)type;
     } else if (array->Item(i).GetUnit() == eCSSUnit_Function) {
-      nsCSSValue::Array* shapeFunction = array->Item(i).GetArrayValue();
-      nsCSSKeyword functionName =
-        (nsCSSKeyword)shapeFunction->Item(0).GetIntValue();
-      if (functionName == eCSSKeyword_polygon) {
-        MOZ_ASSERT(!basicShape, "did not expect value");
-        basicShape = new nsStyleBasicShape(nsStyleBasicShape::ePolygon);
-        MOZ_ASSERT(shapeFunction->Count() > 1,
-                   "polygon has wrong number of arguments");
-        size_t j = 1;
-        if (shapeFunction->Item(j).GetUnit() == eCSSUnit_Enumerated) {
-          basicShape->SetFillRule(shapeFunction->Item(j).GetIntValue());
-          ++j;
-        }
-        const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
-                             SETCOORD_STORE_CALC;
-        const nsCSSValuePairList* curPair =
-          shapeFunction->Item(j).GetPairListValue();
-        nsTArray<nsStyleCoord>& coordinates = basicShape->Coordinates();
-        while (curPair) {
-          nsStyleCoord xCoord, yCoord;
-          DebugOnly<bool> didSetCoordX = SetCoord(curPair->mXValue, xCoord,
-                                                  nsStyleCoord(), mask,
-                                                  aStyleContext, aPresContext,
-                                                  aConditions);
-          coordinates.AppendElement(xCoord);
-          MOZ_ASSERT(didSetCoordX, "unexpected x coordinate unit");
-          DebugOnly<bool> didSetCoordY = SetCoord(curPair->mYValue, yCoord,
-                                                  nsStyleCoord(), mask,
-                                                  aStyleContext, aPresContext,
-                                                  aConditions);
-          coordinates.AppendElement(yCoord);
-          MOZ_ASSERT(didSetCoordY, "unexpected y coordinate unit");
-          curPair = curPair->mNext;
-        }
-      } else if (functionName == eCSSKeyword_circle ||
-                 functionName == eCSSKeyword_ellipse) {
-        nsStyleBasicShape::Type type = functionName == eCSSKeyword_circle ?
-                                       nsStyleBasicShape::eCircle :
-                                       nsStyleBasicShape::eEllipse;
-        MOZ_ASSERT(!basicShape, "did not expect value");
-        basicShape = new nsStyleBasicShape(type);
-        const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
-                             SETCOORD_STORE_CALC | SETCOORD_ENUMERATED;
-        size_t count = type == nsStyleBasicShape::eCircle ? 2 : 3;
-        MOZ_ASSERT(shapeFunction->Count() == count + 1,
-                   "unexpected arguments count");
-        MOZ_ASSERT(type == nsStyleBasicShape::eCircle ||
-                   (shapeFunction->Item(1).GetUnit() == eCSSUnit_Null) ==
-                   (shapeFunction->Item(2).GetUnit() == eCSSUnit_Null),
-                   "ellipse should have two radii or none");
-        for (size_t j = 1; j < count; ++j) {
-          const nsCSSValue& val = shapeFunction->Item(j);
-          nsStyleCoord radius;
-          if (val.GetUnit() != eCSSUnit_Null) {
-            DebugOnly<bool> didSetRadius = SetCoord(val, radius,
-                                                    nsStyleCoord(), mask,
-                                                    aStyleContext,
-                                                    aPresContext,
-                                                    aConditions);
-            MOZ_ASSERT(didSetRadius, "unexpected radius unit");
-          } else {
-            radius.SetIntValue(NS_RADIUS_CLOSEST_SIDE, eStyleUnit_Enumerated);
-          }
-          basicShape->Coordinates().AppendElement(radius);
-        }
-        const nsCSSValue& positionVal = shapeFunction->Item(count);
-        if (positionVal.GetUnit() == eCSSUnit_Array) {
-          ComputePositionValue(aStyleContext, positionVal,
-                               basicShape->GetPosition(),
-                               aConditions);
-        } else {
-            MOZ_ASSERT(positionVal.GetUnit() == eCSSUnit_Null,
-                       "expected no value");
-        }
-      } else if (functionName == eCSSKeyword_inset) {
-        MOZ_ASSERT(!basicShape, "did not expect value");
-        basicShape = new nsStyleBasicShape(nsStyleBasicShape::eInset);
-        MOZ_ASSERT(shapeFunction->Count() == 6,
-                   "inset function has wrong number of arguments");
-        MOZ_ASSERT(shapeFunction->Item(1).GetUnit() != eCSSUnit_Null,
-                   "no shape arguments defined");
-        const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
-                             SETCOORD_STORE_CALC;
-        nsTArray<nsStyleCoord>& coords = basicShape->Coordinates();
-        for (size_t j = 1; j <= 4; ++j) {
-          const nsCSSValue& val = shapeFunction->Item(j);
-          nsStyleCoord inset;
-          // Fill missing values to get 4 at the end.
-          if (val.GetUnit() == eCSSUnit_Null) {
-            if (j == 4) {
-              inset = coords[1];
-            } else {
-              MOZ_ASSERT(j != 1, "first argument not specified");
-              inset = coords[0];
-            }
-          } else {
-            DebugOnly<bool> didSetInset = SetCoord(val, inset,
-                                                   nsStyleCoord(), mask,
-                                                   aStyleContext, aPresContext,
-                                                   aConditions);
-            MOZ_ASSERT(didSetInset, "unexpected inset unit");
-          }
-          coords.AppendElement(inset);
-        }
-
-        nsStyleCorners& insetRadius = basicShape->GetRadius();
-        if (shapeFunction->Item(5).GetUnit() == eCSSUnit_Array) {
-          nsCSSValue::Array* radiiArray = shapeFunction->Item(5).GetArrayValue();
-          NS_FOR_CSS_FULL_CORNERS(corner) {
-            int cx = NS_FULL_TO_HALF_CORNER(corner, false);
-            int cy = NS_FULL_TO_HALF_CORNER(corner, true);
-            const nsCSSValue& radius = radiiArray->Item(corner);
-            nsStyleCoord coordX, coordY;
-            DebugOnly<bool> didSetRadii = SetPairCoords(radius, coordX, coordY,
-                                                        nsStyleCoord(),
-                                                        nsStyleCoord(), mask,
-                                                        aStyleContext,
-                                                        aPresContext,
-                                                        aConditions);
-            MOZ_ASSERT(didSetRadii, "unexpected radius unit");
-            insetRadius.Set(cx, coordX);
-            insetRadius.Set(cy, coordY);
-          }
-        } else {
-          MOZ_ASSERT(shapeFunction->Item(5).GetUnit() == eCSSUnit_Null,
-                     "unexpected value");
-          // Initialize border-radius
-          nsStyleCoord zero;
-          zero.SetCoordValue(0);
-          NS_FOR_CSS_HALF_CORNERS(j) {
-            insetRadius.Set(j, zero);
-          }
-        }
-      } else {
-        NS_NOTREACHED("unexpected basic shape function");
-        return;
-      }
+      basicShape = GetStyleBasicShapeFromCSSValue(array->Item(i), aStyleContext,
+                                                  aPresContext, aConditions);
     } else {
       NS_NOTREACHED("unexpected value");
       return;

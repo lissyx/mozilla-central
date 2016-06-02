@@ -750,7 +750,7 @@ DXGID3D9TextureData::DXGID3D9TextureData(gfx::SurfaceFormat aFormat,
 
 DXGID3D9TextureData::~DXGID3D9TextureData()
 {
-  gfxWindowsPlatform::sD3D9SharedTextureUsed -= mDesc.Width * mDesc.Height * 4;
+  gfxWindowsPlatform::sD3D9SharedTextures -= mDesc.Width * mDesc.Height * 4;
   MOZ_COUNT_DTOR(DXGID3D9TextureData);
 }
 
@@ -787,7 +787,7 @@ DXGID3D9TextureData::Create(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
   DXGID3D9TextureData* data = new DXGID3D9TextureData(aFormat, texture, shareHandle, aDevice);
   data->mDesc = surfaceDesc;
 
-  gfxWindowsPlatform::sD3D9SharedTextureUsed += aSize.width * aSize.height * 4;
+  gfxWindowsPlatform::sD3D9SharedTextures += aSize.width * aSize.height * 4;
   return data;
 }
 
@@ -1053,6 +1053,11 @@ DXGITextureHostD3D9::Lock()
 {
   MOZ_ASSERT(!mIsLocked);
 
+  if (!mCompositor) {
+    NS_WARNING("no suitable compositor");
+    return false;
+  }
+
   if (!GetDevice()) {
     return false;
   }
@@ -1122,6 +1127,11 @@ DXGIYCbCrTextureHostD3D9::SetCompositor(Compositor* aCompositor)
 bool
 DXGIYCbCrTextureHostD3D9::Lock()
 {
+  if (!mCompositor) {
+    NS_WARNING("no suitable compositor");
+    return false;
+  }
+
   if (!GetDevice()) {
     NS_WARNING("trying to lock a TextureHost without a D3D device");
     return false;

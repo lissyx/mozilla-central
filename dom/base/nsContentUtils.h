@@ -32,6 +32,7 @@
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/net/ReferrerPolicy.h"
 #include "mozilla/Logging.h"
+#include "mozilla/NotNull.h"
 #include "nsIContentPolicy.h"
 
 #if defined(XP_WIN)
@@ -169,6 +170,9 @@ struct EventNameMapping
   int32_t  mType;
   mozilla::EventMessage mMessage;
   mozilla::EventClassID mEventClassID;
+  // True if mAtom is possibly used by special SVG/SMIL events, but
+  // mMessage is eUnidentifiedEvent. See EventNameList.h
+  bool mMaybeSpecialSVGorSMILEvent;
 };
 
 typedef bool (*CallOnRemoteChildFunction) (mozilla::dom::TabParent* aTabParent,
@@ -1170,6 +1174,13 @@ public:
    * @param aName the event name to look up
    */
   static mozilla::EventMessage GetEventMessage(nsIAtom* aName);
+
+  /**
+   * Returns the EventMessage and nsIAtom to be used for event listener
+   * registration.
+   */
+  static mozilla::EventMessage
+  GetEventMessageAndAtomForListener(const nsAString& aName, nsIAtom** aOnName);
 
   /**
    * Return the EventClassID for the event with the given name. The name is the
@@ -2422,8 +2433,9 @@ public:
    * Get the pixel data from the given source surface and return it as a buffer.
    * The length and stride will be assigned from the surface.
    */
-  static mozilla::UniquePtr<char[]> GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
-                                                   size_t* aLength, int32_t* aStride);
+  static mozilla::UniquePtr<char[]> GetSurfaceData(
+    mozilla::NotNull<mozilla::gfx::DataSourceSurface*> aSurface,
+    size_t* aLength, int32_t* aStride);
 
   // Helpers shared by the implementations of nsContentUtils methods and
   // nsIDOMWindowUtils methods.
@@ -2553,6 +2565,12 @@ public:
 
   static void SetScrollbarsVisibility(nsIDocShell* aDocShell, bool aVisible);
 
+  /*
+   * Return the associated presentation URL of the presented content.
+   * Will return empty string if the docshell is not in a presented content.
+   */
+  static void GetPresentationURL(nsIDocShell* aDocShell, nsAString& aPresentationUrl);
+
 private:
   static bool InitializeEventTable();
 
@@ -2618,15 +2636,6 @@ private:
   static nsIIOService *sIOService;
   static nsIUUIDGenerator *sUUIDGenerator;
 
-  static bool sImgLoaderInitialized;
-  static void InitImgLoader();
-
-  // The following four members are initialized lazily
-  static imgLoader* sImgLoader;
-  static imgLoader* sPrivateImgLoader;
-  static imgICache* sImgCache;
-  static imgICache* sPrivateImgCache;
-
   static nsIConsoleService* sConsoleService;
 
   static nsDataHashtable<nsISupportsHashKey, EventNameMapping>* sAtomEventTable;
@@ -2649,7 +2658,7 @@ private:
   static uint32_t sDOMNodeRemovedSuppressCount;
   static uint32_t sMicroTaskLevel;
   // Not an nsCOMArray because removing elements from those is slower
-  static nsTArray< nsCOMPtr<nsIRunnable> >* sBlockedScriptRunners;
+  static AutoTArray<nsCOMPtr<nsIRunnable>, 8>* sBlockedScriptRunners;
   static uint32_t sRunnersCountAtFirstBlocker;
   static uint32_t sScriptBlockerCountWhereRunnersPrevented;
 

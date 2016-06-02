@@ -83,12 +83,6 @@ devtools/client/commandline/**
 devtools/client/debugger/**
 devtools/client/eyedropper/**
 devtools/client/framework/**
-# devtools/client/inspector/shared/*.js files are eslint-clean, so they aren't
-# included in the ignore list.
-devtools/client/inspector/fonts/**
-devtools/client/inspector/test/**
-devtools/client/inspector/*.js
-!devtools/client/inspector/breadcrumbs.js
 devtools/client/jsonview/lib/**
 devtools/client/memory/**
 devtools/client/netmonitor/test/**
@@ -111,12 +105,14 @@ devtools/client/webaudioeditor/**
 devtools/client/webconsole/**
 !devtools/client/webconsole/panel.js
 !devtools/client/webconsole/jsterm.js
+!devtools/client/webconsole/console-commands.js
 devtools/client/webide/**
 devtools/server/**
 !devtools/server/actors/webbrowser.js
 !devtools/server/actors/styles.js
 devtools/shared/*.js
 !devtools/shared/css-lexer.js
+!devtools/shared/promise_defer.js
 !devtools/shared/task.js
 devtools/shared/*.jsm
 devtools/shared/apps/**
