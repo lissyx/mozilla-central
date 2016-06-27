@@ -3228,7 +3228,7 @@ namespace {
 // This runnable is used to write a deprecation message from a worker to the
 // console running on the main-thread.
 class DeprecationWarningRunnable final : public Runnable
-                                       , public WorkerFeature
+                                       , public WorkerHolder
 {
   WorkerPrivate* mWorkerPrivate;
   nsIDocument::DeprecatedOperations mOperation;
@@ -3245,12 +3245,12 @@ public:
   void
   Dispatch()
   {
-    if (NS_WARN_IF(!mWorkerPrivate->AddFeature(this))) {
+    if (NS_WARN_IF(!HoldWorker(mWorkerPrivate))) {
       return;
     }
 
     if (NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(this)))) {
-      mWorkerPrivate->RemoveFeature(this);
+      ReleaseWorker();
       return;
     }
   }
@@ -3281,12 +3281,12 @@ private:
       window->GetExtantDoc()->WarnOnceAbout(mOperation);
     }
 
-    ReleaseWorker();
+    ReleaseWorkerHolder();
     return NS_OK;
   }
 
   void
-  ReleaseWorker()
+  ReleaseWorkerHolder()
   {
     class ReleaseRunnable final : public MainThreadWorkerRunnable
     {
@@ -3305,7 +3305,7 @@ private:
         MOZ_ASSERT(aWorkerPrivate);
         aWorkerPrivate->AssertIsOnWorkerThread();
 
-        aWorkerPrivate->RemoveFeature(mRunnable);
+        mRunnable->ReleaseWorker();
         return true;
       }
     };

@@ -87,60 +87,32 @@ js::TraceCycleDetectionSet(JSTracer* trc, AutoCycleDetector::Set& set)
         TraceRoot(trc, &e.mutableFront(), "cycle detector table entry");
 }
 
-JSContext*
-js::NewContext(JSRuntime* rt, size_t stackChunkSize)
+bool
+JSContext::init(uint32_t maxBytes, uint32_t maxNurseryBytes)
 {
-    JS_AbortIfWrongThread(rt);
+    if (!JSRuntime::init(maxBytes, maxNurseryBytes))
+        return false;
 
-    MOZ_RELEASE_ASSERT(!rt->haveCreatedContext,
-                       "There must be at most 1 JSContext per runtime");
+    return true;
+}
 
-    JSContext* cx = js_new<JSContext>(rt);
+JSContext*
+js::NewContext(uint32_t maxBytes, uint32_t maxNurseryBytes, JSRuntime* parentRuntime)
+{
+    JSContext* cx = js_new<JSContext>(parentRuntime);
     if (!cx)
         return nullptr;
 
-    if (!cx->cycleDetectorSet.init()) {
+    if (!cx->init(maxBytes, maxNurseryBytes)) {
         js_delete(cx);
         return nullptr;
-    }
-
-    /*
-     * Here the GC lock is still held after js_InitContextThreadAndLockGC took it and
-     * the GC is not running on another thread.
-     */
-    rt->contextList.insertBack(cx);
-
-    /*
-     * If cx is the first context on this runtime, initialize well-known atoms,
-     * keywords, numbers, strings and self-hosted scripts. If one of these
-     * steps should fail, the runtime will be left in a partially initialized
-     * state, with zeroes and nulls stored in the default-initialized remainder
-     * of the struct.
-     */
-    if (!rt->haveCreatedContext) {
-        JS_BeginRequest(cx);
-        bool ok = rt->initializeAtoms(cx);
-        if (ok)
-            ok = rt->initSelfHosting(cx);
-
-        if (ok && !rt->parentRuntime)
-            ok = rt->transformToPermanentAtoms(cx);
-
-        JS_EndRequest(cx);
-
-        if (!ok) {
-            DestroyContext(cx, DCM_NEW_FAILED);
-            return nullptr;
-        }
-
-        rt->haveCreatedContext = true;
     }
 
     return cx;
 }
 
 void
-js::DestroyContext(JSContext* cx, DestroyContextMode mode)
+js::DestroyContext(JSContext* cx)
 {
     JSRuntime* rt = cx->runtime();
     JS_AbortIfWrongThread(rt);
@@ -151,21 +123,13 @@ js::DestroyContext(JSContext* cx, DestroyContextMode mode)
     cx->roots.checkNoGCRooters();
     cx->roots.finishPersistentRoots();
 
-    cx->remove();
-    bool last = !rt->hasContexts();
-    if (last) {
-        /*
-         * Dump remaining type inference results while we still have a context.
-         * This printing depends on atoms still existing.
-         */
-        for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
-            PrintTypes(cx, c, false);
-    }
-    if (mode == DCM_FORCE_GC) {
-        MOZ_ASSERT(!rt->isHeapBusy());
-        JS::PrepareForFullGC(rt);
-        rt->gc.gc(GC_NORMAL, JS::gcreason::DESTROY_CONTEXT);
-    }
+    /*
+     * Dump remaining type inference results while we still have a context.
+     * This printing depends on atoms still existing.
+     */
+    for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
+        PrintTypes(cx, c, false);
+
     js_delete_poison(cx);
 }
 
@@ -904,8 +868,9 @@ ExclusiveContext::recoverFromOutOfMemory()
         task->outOfMemory = false;
 }
 
-JSContext::JSContext(JSRuntime* rt)
-  : ExclusiveContext(rt, &rt->mainThread, Context_JS),
+JSContext::JSContext(JSRuntime* parentRuntime)
+  : ExclusiveContext(this, &this->JSRuntime::mainThread, Context_JS),
+    JSRuntime(this, parentRuntime),
     throwing(false),
     unwrappedException_(this),
     overRecursed_(false),
@@ -915,8 +880,6 @@ JSContext::JSContext(JSRuntime* rt)
     resolvingList(nullptr),
     generatingError(false),
     cycleDetectorSet(this),
-    data(nullptr),
-    data2(nullptr),
     outstandingRequests(0),
     jitIsBroken(false)
 {
@@ -926,6 +889,8 @@ JSContext::JSContext(JSRuntime* rt)
 
 JSContext::~JSContext()
 {
+    destroyRuntime();
+
     /* Free the stuff hanging off of cx. */
     MOZ_ASSERT(!resolvingList);
 }
@@ -1057,22 +1022,21 @@ JSContext::updateJITEnabled()
 }
 
 size_t
-JSContext::sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const
+JSContext::sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const
 {
     /*
      * There are other JSContext members that could be measured; the following
      * ones have been found by DMD to be worth measuring.  More stuff may be
      * added later.
      */
-    return mallocSizeOf(this) + cycleDetectorSet.sizeOfExcludingThis(mallocSizeOf);
+    return cycleDetectorSet.sizeOfExcludingThis(mallocSizeOf);
 }
 
 void
 JSContext::mark(JSTracer* trc)
 {
-    /* Stack frames and slots are traced by StackSpace::mark. */
-
-    TraceCycleDetectionSet(trc, cycleDetectorSet);
+    if (cycleDetectorSet.initialized())
+        TraceCycleDetectionSet(trc, cycleDetectorSet);
 
     if (compartment_)
         compartment_->mark();

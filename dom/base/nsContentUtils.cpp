@@ -5469,7 +5469,10 @@ nsContentUtils::GetCurrentJSContext()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(IsInitialized());
-  return sXPConnect->GetCurrentJSContext();
+  if (!IsJSAPIActive()) {
+    return nullptr;
+  }
+  return GetSafeJSContext();
 }
 
 /* static */
@@ -9078,6 +9081,9 @@ nsContentUtils::GetPresentationURL(nsIDocShell* aDocShell, nsAString& aPresentat
   nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(aDocShell));
   nsCOMPtr<nsIDOMElement> topFrameElement;
   loadContext->GetTopFrameElement(getter_AddRefs(topFrameElement));
+  if (!topFrameElement) {
+    return;
+  }
 
   topFrameElement->GetAttribute(NS_LITERAL_STRING("mozpresentation"), aPresentationUrl);
 }

@@ -3511,7 +3511,7 @@ CodeGenerator::emitPostWriteBarrier(const LAllocation* obj)
     bool isGlobal = false;
     if (obj->isConstant()) {
         object = &obj->toConstant()->toObject();
-        isGlobal = object->is<GlobalObject>();
+        isGlobal = isGlobalObject(object);
         objreg = regs.takeAny();
         masm.movePtr(ImmGCPtr(object), objreg);
     } else {
@@ -3551,7 +3551,7 @@ CodeGenerator::maybeEmitGlobalBarrierCheck(const LAllocation* maybeGlobal, OutOf
         return;
 
     JSObject* obj = &maybeGlobal->toConstant()->toObject();
-    if (!obj->is<GlobalObject>())
+    if (!isGlobalObject(obj))
         return;
 
     JSCompartment* comp = obj->compartment();
@@ -9318,7 +9318,7 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
     if (isProfilerInstrumentationEnabled())
         ionScript->setHasProfilingInstrumentation();
 
-    script->setIonScript(cx, ionScript);
+    script->setIonScript(cx->runtime(), ionScript);
 
     // Adopt fallback shared stubs from the compiler into the ion script.
     ionScript->adoptFallbackStubs(&stubSpace_);

@@ -151,6 +151,7 @@ this.GeckoDriver = function(appName, device, stopSignal) {
     "XULappId" : Services.appinfo.ID,
     "appBuildId" : Services.appinfo.appBuildID,
     "device": device,
+    "processId" : Services.appinfo.processID,
     "version": Services.appinfo.version,
   };
 
@@ -206,7 +207,6 @@ GeckoDriver.prototype.switchToGlobalMessageManager = function() {
  *     Command ID to ensure synchronisity.
  */
 GeckoDriver.prototype.sendAsync = function(name, msg, cmdId) {
-  logger.info(`sendAsync ${this.sessionId}`)
   let curRemoteFrame = this.curBrowser.frameManager.currentRemoteFrame;
   name = "Marionette:" + name;
 
@@ -1817,7 +1817,8 @@ GeckoDriver.prototype.getElementProperty = function*(cmd, resp) {
       break;
 
     case Context.CONTENT:
-      return this.listener.getElementProperty(id, name);
+      resp.body.value = yield this.listener.getElementProperty(id, name);
+      break;
   }
 };
 

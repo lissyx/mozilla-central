@@ -2341,13 +2341,22 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     el.className = "stack-trace-tooltip devtools-monospace";
 
     for (let f of stacktrace) {
-      let { functionName, filename, lineNumber, columnNumber } = f;
+      let { functionName, filename, lineNumber, columnNumber, asyncCause } = f;
 
-      // Parse a stack frame in format "url -> url"
+      if (asyncCause) {
+        // if there is asyncCause, append a "divider" row into the trace
+        let asyncFrameEl = doc.createElementNS(HTML_NS, "div");
+        asyncFrameEl.className = "stack-frame stack-frame-async";
+        asyncFrameEl.textContent =
+          WEBCONSOLE_L10N.getFormatStr("stacktrace.asyncStack", asyncCause);
+        el.appendChild(asyncFrameEl);
+      }
+
+      // Parse a source name in format "url -> url"
       let sourceUrl = filename.split(" -> ").pop();
 
       let frameEl = doc.createElementNS(HTML_NS, "div");
-      frameEl.className = "stack-frame";
+      frameEl.className = "stack-frame stack-frame-call";
 
       let funcEl = doc.createElementNS(HTML_NS, "span");
       funcEl.className = "stack-frame-function-name";
@@ -3634,7 +3643,7 @@ NetworkDetailsView.prototype = {
       errorbox.hidden = false;
 
       // Strip any HTML from the message.
-      let plain = DOMParser.parseFromString(securityInfo.errorMessage,
+      let plain = new DOMParser().parseFromString(securityInfo.errorMessage,
         "text/html");
       setValue("#security-error-message", plain.body.textContent);
     }
