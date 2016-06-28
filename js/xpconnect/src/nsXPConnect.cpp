@@ -32,6 +32,7 @@
 #include "nsIObjectOutputStream.h"
 #include "nsScriptSecurityManager.h"
 #include "nsContentUtils.h"
+#include "nsIPermissionManager.h"
 
 #include "jsfriendapi.h"
 
@@ -437,20 +438,14 @@ InitGlobalObjectOptions(JS::CompartmentOptions& aOptions,
     if (isSystem) {
         // Make sure [SecureContext] APIs are visible:
         aOptions.creationOptions().setSecureContext(true);
-    }
 
-    short status = aPrincipal->GetAppStatus();
-
-    // Enable the ECMA-402 experimental formatToParts in certified apps.
-    if (status == nsIPrincipal::APP_STATUS_CERTIFIED) {
+        // Enable the ECMA-402 experimental formatToParts in any chrome page
         aOptions.creationOptions()
                 .setExperimentalDateTimeFormatFormatToPartsEnabled(true);
     }
 
     if (shouldDiscardSystemSource) {
-        bool discardSource = isSystem ||
-                             (status == nsIPrincipal::APP_STATUS_PRIVILEGED ||
-                              status == nsIPrincipal::APP_STATUS_CERTIFIED);
+        bool discardSource = isSystem;
 
         aOptions.behaviors().setDiscardSource(discardSource);
     }
