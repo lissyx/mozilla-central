@@ -28,6 +28,8 @@ class FakeSpeechRecognitionService : public nsISpeechRecognitionService,
 
   FakeSpeechRecognitionService();
 
+  void SetLang(const nsAString& aLang) { }
+
  private:
   virtual ~FakeSpeechRecognitionService();
 

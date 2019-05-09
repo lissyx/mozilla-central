@@ -310,7 +310,14 @@ static const char SandboxPolicyContent[] = R"SANDBOX_LITERAL(
     ; we have a profile dir
     (allow file-read*
       (profile-subpath "/extensions")
+      (profile-subpath "/deepspeech")
       (profile-subpath "/chrome")))
+
+  (if (defined? 'file-map-executable)
+    (allow file-map-executable file-read*
+      (profile-subpath "/deepspeech"))
+    (allow file-read*
+      (profile-subpath "/deepspeech")))
 
 ; accelerated graphics
   (allow user-preference-read (preference-domain "com.apple.opengl"))

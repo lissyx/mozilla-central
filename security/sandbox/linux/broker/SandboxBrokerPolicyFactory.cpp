@@ -568,6 +568,17 @@ UniquePtr<SandboxBroker::Policy> SandboxBrokerPolicyFactory::GetContentPolicy(
         }
       }
     }
+    rv = profileDir->Clone(getter_AddRefs(workDir));
+    if (NS_SUCCEEDED(rv)) {
+      rv = workDir->AppendNative(NS_LITERAL_CSTRING("deepspeech"));
+      if (NS_SUCCEEDED(rv)) {
+        nsAutoCString tmpPath;
+        rv = workDir->GetNativePath(tmpPath);
+        if (NS_SUCCEEDED(rv)) {
+          policy->AddDir(rdonly, tmpPath.get());
+        }
+      }
+    }
   }
 
   bool allowPulse = false;

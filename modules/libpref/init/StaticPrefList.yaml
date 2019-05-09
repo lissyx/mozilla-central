@@ -6089,16 +6089,36 @@
   mirror: always
 
 #ifdef MOZ_WEBSPEECH
--   name: media.webspeech.recognition.enable
-    type: bool
-    value: false
-    mirror: always
+- name: media.webspeech.recognition.enable
+  type: bool
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+  value: true
+#else
+  value: false
+#endif
+  mirror: always
 #endif
 
 - name: media.webspeech.recognition.force_enable
   type: bool
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+  value: true
+#else
   value: false
+#endif
   mirror: always
+
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+- name: media.webspeech.service.deepspeech.enabled
+  type: bool
+  value: true
+  mirror: always
+
+- name: media.webspeech.service.deepspeech.debug_dir
+  type: String
+  value: ""
+  mirror: never
+#endif # MOZ_WEBSPEECH_DS_BACKEND
 
 #ifdef MOZ_WEBSPEECH
 -   name: media.webspeech.synth.enabled
