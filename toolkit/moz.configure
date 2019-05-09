@@ -821,6 +821,18 @@ def webspeech_test_backend(value):
 set_config('MOZ_WEBSPEECH_TEST_BACKEND', webspeech_test_backend)
 set_define('MOZ_WEBSPEECH_TEST_BACKEND', webspeech_test_backend)
 
+# Speech API DeepSpeech backend
+# ==============================================================
+option('--enable-webspeechdsbackend', default=webspeech,
+       help='{Enable|Disable} support for HTML Speech API DeepSpeech Backend')
+
+@depends_if('--enable-webspeechdsbackend')
+def webspeech_ds_backend(value):
+    return True
+
+set_config('MOZ_WEBSPEECH_DS_BACKEND', webspeech_ds_backend)
+set_define('MOZ_WEBSPEECH_DS_BACKEND', webspeech_ds_backend)
+
 # Enable IPDL's "expensive" unit tests
 # ==============================================================
 option('--enable-ipdl-tests', help='Enable expensive IPDL tests')

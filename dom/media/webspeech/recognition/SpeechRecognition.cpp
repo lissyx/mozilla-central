@@ -46,8 +46,8 @@ namespace mozilla {
 namespace dom {
 
 #define PREFERENCE_DEFAULT_RECOGNITION_SERVICE "media.webspeech.service.default"
-#define DEFAULT_RECOGNITION_SERVICE_PREFIX "pocketsphinx-"
-#define DEFAULT_RECOGNITION_SERVICE "pocketsphinx-en-US"
+#define DEFAULT_RECOGNITION_SERVICE_PREFIX "DS-"
+#define DEFAULT_RECOGNITION_SERVICE "DS"
 
 #define PREFERENCE_ENDPOINTER_SILENCE_LENGTH "media.webspeech.silence_length"
 #define PREFERENCE_ENDPOINTER_LONG_SILENCE_LENGTH \
@@ -58,10 +58,10 @@ namespace dom {
 static const uint32_t kSAMPLE_RATE = 16000;
 static const uint32_t kSPEECH_DETECTION_TIMEOUT_MS = 10000;
 
-// number of frames corresponding to 300ms of audio to send to endpointer while
+// number of frames corresponding to 160ms of audio to send to endpointer while
 // it's in environment estimation mode
 // kSAMPLE_RATE frames = 1s, kESTIMATION_FRAMES frames = 300ms
-static const uint32_t kESTIMATION_SAMPLES = 300 * kSAMPLE_RATE / 1000;
+static const uint32_t kESTIMATION_SAMPLES = 160 * kSAMPLE_RATE / 1000;
 
 LogModule* GetSpeechRecognitionLog() {
   static LazyLogModule sLog("SpeechRecognition");
@@ -74,32 +74,30 @@ already_AddRefed<nsISpeechRecognitionService> GetSpeechRecognitionService(
     const nsAString& aLang) {
   nsAutoCString speechRecognitionServiceCID;
 
+  SR_LOG("GetSpeechRecognitionService()");
+
   nsAutoCString prefValue;
   Preferences::GetCString(PREFERENCE_DEFAULT_RECOGNITION_SERVICE, prefValue);
   nsAutoCString speechRecognitionService;
 
-  if (!aLang.IsEmpty()) {
-    speechRecognitionService =
-        NS_LITERAL_CSTRING(DEFAULT_RECOGNITION_SERVICE_PREFIX) +
-        NS_ConvertUTF16toUTF8(aLang);
-  } else if (!prefValue.IsEmpty()) {
-    speechRecognitionService = prefValue;
-  } else {
-    speechRecognitionService = DEFAULT_RECOGNITION_SERVICE;
-  }
+  speechRecognitionService = DEFAULT_RECOGNITION_SERVICE;
 
   if (StaticPrefs::MediaWebspeechTextFakeRecognitionService()) {
+    SR_LOG("GetSpeechRecognitionService() fake");
     speechRecognitionServiceCID =
         NS_SPEECH_RECOGNITION_SERVICE_CONTRACTID_PREFIX "fake";
   } else {
     speechRecognitionServiceCID =
         NS_LITERAL_CSTRING(NS_SPEECH_RECOGNITION_SERVICE_CONTRACTID_PREFIX) +
         speechRecognitionService;
+    SR_LOG("GetSpeechRecognitionService() non fake");
   }
 
   nsresult rv;
   nsCOMPtr<nsISpeechRecognitionService> recognitionService;
   recognitionService = do_GetService(speechRecognitionServiceCID.get(), &rv);
+
+  SR_LOG("GetSpeechRecognitionService() get service");
   return recognitionService.forget();
 }
 
@@ -176,6 +174,9 @@ JSObject* SpeechRecognition::WrapObject(JSContext* aCx,
 bool SpeechRecognition::IsAuthorized(JSContext* aCx, JSObject* aGlobal) {
   nsCOMPtr<nsIPrincipal> principal = nsContentUtils::ObjectPrincipal(aGlobal);
 
+  return true;
+
+#if 0
   nsresult rv;
   nsCOMPtr<nsIPermissionManager> mgr =
       do_GetService(NS_PERMISSIONMANAGER_CONTRACTID, &rv);
@@ -197,6 +198,7 @@ bool SpeechRecognition::IsAuthorized(JSContext* aCx, JSObject* aGlobal) {
           StaticPrefs::MediaWebspeechRecognitionForceEnable() ||
           StaticPrefs::MediaWebspeechTestEnable()) &&
          StaticPrefs::MediaWebspeechRecognitionEnable();
+#endif
 }
 
 already_AddRefed<SpeechRecognition> SpeechRecognition::Constructor(
@@ -698,6 +700,11 @@ void SpeechRecognition::Start(const Optional<NonNull<DOMMediaStream>>& aStream,
 
   MediaStreamConstraints constraints;
   constraints.mAudio.SetAsBoolean() = true;
+#ifdef MOZ_WEBSPEECh_DS_BACKEND
+  // constraints.mEchoCancellation = true;
+  constraints.mNoiseSuppression = true;
+  constraints.mAutoGainControl  = true;
+#endif
 
   if (aStream.WasPassed()) {
     mStream = &aStream.Value();

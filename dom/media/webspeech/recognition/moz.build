@@ -26,6 +26,11 @@ if CONFIG['MOZ_WEBSPEECH_TEST_BACKEND']:
         'test/FakeSpeechRecognitionService.h',
     ]
 
+if CONFIG['MOZ_WEBSPEECH_DS_BACKEND']:
+    EXPORTS.mozilla.dom += [
+        'DSSpeechRecognitionService.h',
+    ]
+
 UNIFIED_SOURCES += [
     'endpointer.cc',
     'energy_endpointer.cc',
@@ -42,6 +47,11 @@ UNIFIED_SOURCES += [
 if CONFIG['MOZ_WEBSPEECH_TEST_BACKEND']:
     UNIFIED_SOURCES += [
         'test/FakeSpeechRecognitionService.cpp',
+    ]
+
+if CONFIG['MOZ_WEBSPEECH_DS_BACKEND']:
+    UNIFIED_SOURCES += [
+        'DSSpeechRecognitionService.cpp',
     ]
 
 LOCAL_INCLUDES += [

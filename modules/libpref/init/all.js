@@ -553,6 +553,17 @@ pref("media.media-capabilities.screen.enabled", false);
 #ifdef MOZ_WEBSPEECH
 pref("media.webspeech.synth.enabled", false);
 #endif
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+pref("media.webspeech.service.deepspeech.model", "/home/alex/tmp/deepspeech/0.5.0/output_graph_noiseres.pb");
+pref("media.webspeech.service.deepspeech.alphabet", "/home/alex/tmp/deepspeech/0.5.0a5/alphabet.txt");
+pref("media.webspeech.service.deepspeech.lmbinary", "/home/alex/tmp/deepspeech/0.5.0a5/lm.binary");
+pref("media.webspeech.service.deepspeech.lmtrie", "/home/alex/tmp/deepspeech/0.5.0a5/trie");
+pref("media.webspeech.service.deepspeech.ncep", 26);
+pref("media.webspeech.service.deepspeech.ncontext", 9);
+pref("media.webspeech.service.deepspeech.beamwidth", 500);
+pref("media.webspeech.service.deepspeech.lmalpha", "0.75");
+pref("media.webspeech.service.deepspeech.lmbeta", "1.85");
+#endif
 #ifdef MOZ_WEBM_ENCODER
 pref("media.encoder.webm.enabled", true);
 #endif
