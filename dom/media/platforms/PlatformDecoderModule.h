@@ -36,6 +36,7 @@ class ImageContainer;
 class GpuDecoderModule;
 class MediaDataDecoder;
 class RemoteDecoderModule;
+class SpeechDecoderModule;
 class TaskQueue;
 class CDMProxy;
 
@@ -63,6 +64,12 @@ struct MOZ_STACK_CLASS CreateDecoderParams final {
   struct UseNullDecoder {
     UseNullDecoder() = default;
     explicit UseNullDecoder(bool aUseNullDecoder) : mUse(aUseNullDecoder) {}
+    bool mUse = false;
+  };
+
+  struct UseSpeechDecoder {
+    UseSpeechDecoder() = default;
+    explicit UseSpeechDecoder(bool aUseSpeechDecoder) : mUse(aUseSpeechDecoder) {}
     bool mUse = false;
   };
 
@@ -96,6 +103,11 @@ struct MOZ_STACK_CLASS CreateDecoderParams final {
     return *mConfig.GetAsAudioInfo();
   }
 
+  const SpeechInfo& SpeechConfig() const {
+    MOZ_ASSERT(mConfig.IsSpeech());
+    return *mConfig.GetAsSpeechInfo();
+  }
+
   layers::LayersBackend GetLayersBackend() const {
     if (mKnowsCompositor) {
       return mKnowsCompositor->GetCompositorBackendType();
@@ -111,6 +123,7 @@ struct MOZ_STACK_CLASS CreateDecoderParams final {
   RefPtr<layers::KnowsCompositor> mKnowsCompositor;
   RefPtr<GMPCrashHelper> mCrashHelper;
   UseNullDecoder mUseNullDecoder;
+  UseSpeechDecoder mUseSpeechDecoder;
   NoWrapper mNoWrapper;
   TrackInfo::TrackType mType = TrackInfo::kUndefinedTrack;
   MediaEventProducer<TrackInfo::TrackType>* mOnWaitingForKeyEvent = nullptr;
@@ -129,6 +142,9 @@ struct MOZ_STACK_CLASS CreateDecoderParams final {
   void Set(GMPCrashHelper* aCrashHelper) { mCrashHelper = aCrashHelper; }
   void Set(UseNullDecoder aUseNullDecoder) {
     mUseNullDecoder = aUseNullDecoder;
+  }
+  void Set(UseSpeechDecoder aUseSpeechDecoder) {
+    mUseSpeechDecoder = aUseSpeechDecoder;
   }
   void Set(NoWrapper aNoWrapper) { mNoWrapper = aNoWrapper; }
   void Set(OptionSet aOptions) { mOptions = aOptions; }
@@ -204,6 +220,7 @@ class PlatformDecoderModule {
   friend class GpuDecoderModule;
   friend class EMEDecoderModule;
   friend class RemoteDecoderModule;
+  friend class SpeechDecoderModule;
 
   // Indicates if the PlatformDecoderModule supports decoding of aColorDepth.
   // Should override this method when the platform can support color depth != 8.
@@ -236,6 +253,18 @@ class PlatformDecoderModule {
   // It is safe to store a reference to aConfig.
   // This is called on the decode task queue.
   virtual already_AddRefed<MediaDataDecoder> CreateAudioDecoder(
+      const CreateDecoderParams& aParams) = 0;
+
+  // Creates a Speech decoder with the specified properties.
+  // Asynchronous decoding of audio should be done in runnables dispatched to
+  // aSpeechTaskQueue. If the task queue isn't needed, the decoder should
+  // not hold a reference to it.
+  // Returns nullptr if the decoder can't be created.
+  // On Windows the task queue's threads in have MSCOM initialized with
+  // COINIT_MULTITHREADED.
+  // It is safe to store a reference to aConfig.
+  // This is called on the decode task queue.
+  virtual already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
       const CreateDecoderParams& aParams) = 0;
 };
 

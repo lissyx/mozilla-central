@@ -20,6 +20,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/GpuDecoderModule.h"
 #include "mozilla/RemoteDecoderModule.h"
+#include "SpeechDecoderModule.h"
 #include "mozilla/SharedThreadPool.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "mozilla/StaticPtr.h"
@@ -128,6 +129,15 @@ class SupportChecker {
                                   "with YUV444 chroma subsampling.")));
           }
         }
+        return CheckResult(SupportChecker::Reason::kSupported);
+      });
+    }
+    
+    if (aTrackConfig.IsSpeech()) {
+      auto mimeType = aTrackConfig.GetAsSpeechInfo()->mMimeType;
+      RefPtr<MediaByteBuffer> extraData =
+          aTrackConfig.GetAsSpeechInfo()->mExtraData;
+      AddToCheckList([mimeType, extraData]() {
         return CheckResult(SupportChecker::Reason::kSupported);
       });
     }
@@ -272,6 +282,11 @@ already_AddRefed<MediaDataDecoder> PDMFactory::CreateDecoderWithPDM(
     return nullptr;
   }
 
+  if (config.IsSpeech()) {
+    m = aPDM->CreateSpeechDecoder(aParams);
+    return m.forget();
+  }
+
   if (config.IsAudio()) {
     m = aPDM->CreateAudioDecoder(aParams);
     return m.forget();
@@ -286,7 +301,8 @@ already_AddRefed<MediaDataDecoder> PDMFactory::CreateDecoderWithPDM(
 
   if ((MP4Decoder::IsH264(config.mMimeType) ||
        VPXDecoder::IsVPX(config.mMimeType)) &&
-      !aParams.mUseNullDecoder.mUse && !aParams.mNoWrapper.mDontUseWrapper) {
+      !aParams.mUseNullDecoder.mUse &&
+      !aParams.mNoWrapper.mDontUseWrapper) {
     RefPtr<MediaChangeMonitor> h = new MediaChangeMonitor(aPDM, aParams);
     const MediaResult result = h->GetLastError();
     if (NS_SUCCEEDED(result) || result == NS_ERROR_NOT_INITIALIZED) {
@@ -348,6 +364,11 @@ void PDMFactory::CreatePDMs() {
     m = new RemoteDecoderModule;
     StartupPDM(m);
   }
+
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+  m = new SpeechDecoderModule();
+  StartupPDM(m);
+#endif
 
 #ifdef XP_WIN
   if (StaticPrefs::media_wmf_enabled() && !IsWin7AndPre2000Compatible()) {

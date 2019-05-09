@@ -24,6 +24,7 @@ namespace mozilla {
 class AudioInfo;
 class VideoInfo;
 class TextInfo;
+class SpeechInfo;
 
 class MetadataTag {
  public:
@@ -89,13 +90,16 @@ class TrackInfo {
   virtual AudioInfo* GetAsAudioInfo() { return nullptr; }
   virtual VideoInfo* GetAsVideoInfo() { return nullptr; }
   virtual TextInfo* GetAsTextInfo() { return nullptr; }
+  virtual SpeechInfo* GetAsSpeechInfo() { return nullptr; }
   virtual const AudioInfo* GetAsAudioInfo() const { return nullptr; }
   virtual const VideoInfo* GetAsVideoInfo() const { return nullptr; }
   virtual const TextInfo* GetAsTextInfo() const { return nullptr; }
+  virtual const SpeechInfo* GetAsSpeechInfo() const { return nullptr; }
 
   bool IsAudio() const { return !!GetAsAudioInfo(); }
   bool IsVideo() const { return !!GetAsVideoInfo(); }
   bool IsText() const { return !!GetAsTextInfo(); }
+  bool IsSpeech() const { return !!GetAsSpeechInfo(); }
   TrackType GetType() const { return mType; }
 
   bool virtual IsValid() const = 0;
@@ -321,6 +325,38 @@ class AudioInfo : public TrackInfo {
 
   RefPtr<MediaByteBuffer> mCodecSpecificConfig;
   RefPtr<MediaByteBuffer> mExtraData;
+};
+
+class SpeechInfo : public AudioInfo {
+ public:
+  SpeechInfo() : AudioInfo() {}
+
+  SpeechInfo(const SpeechInfo& aOther) = default;
+
+  bool operator==(const SpeechInfo& rhs) const;
+
+  AudioInfo* GetAsAudioInfo() override { return nullptr; }
+
+  const AudioInfo* GetAsAudioInfo() const override { return nullptr; }
+
+  SpeechInfo* GetAsSpeechInfo() override { return this; }
+
+  const SpeechInfo* GetAsSpeechInfo() const override { return this; }
+
+  UniquePtr<TrackInfo> Clone() const override {
+    return MakeUnique<SpeechInfo>(*this);
+  }
+
+  nsString      mLibFilename;
+
+  nsAutoCString mModelFilename;
+  nsAutoCString mLmbinaryFilename;
+  nsAutoCString mLmtrieFilename;
+
+  int   mBeamWidth;
+
+  float mLmAlpha;
+  float mLmBeta;
 };
 
 class EncryptionInfo {

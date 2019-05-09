@@ -38,6 +38,11 @@ class GpuDecoderModule : public PlatformDecoderModule {
     return nullptr;
   }
 
+  already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
+      const CreateDecoderParams& aParams) override {
+    return nullptr;
+  }
+
  private:
   RefPtr<PlatformDecoderModule> mWrapped;
 };

@@ -4,36 +4,36 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#if !defined(AgnosticDecoderModule_h_)
-#  define AgnosticDecoderModule_h_
+#ifndef SpeechDecoderModule_h_
+#define SpeechDecoderModule_h_
 
-#  include "PlatformDecoderModule.h"
+#include "PlatformDecoderModule.h"
+
+#include "mozilla/StaticMutex.h"
 
 namespace mozilla {
 
-class AgnosticDecoderModule : public PlatformDecoderModule {
+class SpeechDecoderModule : public PlatformDecoderModule {
  public:
-  AgnosticDecoderModule() = default;
+  explicit SpeechDecoderModule() {}
 
   bool SupportsMimeType(const nsACString& aMimeType,
                         DecoderDoctorDiagnostics* aDiagnostics) const override;
 
- protected:
-  virtual ~AgnosticDecoderModule() = default;
-  // Decode thread.
   already_AddRefed<MediaDataDecoder> CreateVideoDecoder(
-      const CreateDecoderParams& aParams) override;
-
-  // Decode thread.
-  already_AddRefed<MediaDataDecoder> CreateAudioDecoder(
-      const CreateDecoderParams& aParams) override;
-
-  already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
       const CreateDecoderParams& aParams) override {
     return nullptr;
   }
+
+  already_AddRefed<MediaDataDecoder> CreateAudioDecoder(
+      const CreateDecoderParams& aParams) override {
+    return nullptr;
+  }
+
+  virtual already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
+      const CreateDecoderParams& aParams) override;
 };
 
 }  // namespace mozilla
 
-#endif /* AgnosticDecoderModule_h_ */
+#endif /* SpeechDecoderModule_h_ */

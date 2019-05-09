@@ -159,7 +159,6 @@ RefPtr<MediaDataDecoder::DecodePromise> OmxDataDecoder::Decode(
     MediaRawData* aSample) {
   LOG("sample %p", aSample);
   MOZ_ASSERT(mInitPromise.IsEmpty());
-
   RefPtr<OmxDataDecoder> self = this;
   RefPtr<MediaRawData> sample = aSample;
   return InvokeAsync(mOmxTaskQueue, __func__, [self, this, sample]() {

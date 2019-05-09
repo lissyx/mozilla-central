@@ -273,7 +273,6 @@ RefPtr<MediaDataDecoder::InitPromise> GMPVideoDecoder::Init() {
 RefPtr<MediaDataDecoder::DecodePromise> GMPVideoDecoder::Decode(
     MediaRawData* aSample) {
   MOZ_ASSERT(IsOnGMPThread());
-
   RefPtr<MediaRawData> sample(aSample);
   if (!mGMP) {
     return DecodePromise::CreateAndReject(

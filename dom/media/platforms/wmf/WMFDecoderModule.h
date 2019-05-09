@@ -22,6 +22,11 @@ class WMFDecoderModule : public PlatformDecoderModule {
   already_AddRefed<MediaDataDecoder> CreateAudioDecoder(
       const CreateDecoderParams& aParams) override;
 
+  already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
+      const CreateDecoderParams& aParams) override {
+    return nullptr;
+  }
+
   bool SupportsMimeType(const nsACString& aMimeType,
                         DecoderDoctorDiagnostics* aDiagnostics) const override;
   bool Supports(const TrackInfo& aTrackInfo,

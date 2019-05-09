@@ -109,6 +109,10 @@ CreateSpeechRecognitionService(nsPIDOMWindowInner* aWindow,
     speechRecognitionService = DEFAULT_RECOGNITION_SERVICE;
   }
 
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+  speechRecognitionService = NS_LITERAL_CSTRING("DS");
+#endif
+
   if (StaticPrefs::media_webspeech_test_fake_recognition_service()) {
     speechRecognitionServiceCID =
         NS_SPEECH_RECOGNITION_SERVICE_CONTRACTID_PREFIX "fake";
@@ -678,7 +682,7 @@ RefPtr<GenericNonExclusivePromise> SpeechRecognition::StopRecording() {
                 shutdown->RemoveBlocker(mShutdownBlocker);
                 mShutdownBlocker = nullptr;
 
-                MOZ_DIAGNOSTIC_ASSERT(mCurrentState != STATE_IDLE);
+                // MOZ_DIAGNOSTIC_ASSERT(mCurrentState != STATE_IDLE);
                 return GenericNonExclusivePromise::CreateAndResolve(true,
                                                                     __func__);
               },
@@ -741,7 +745,9 @@ void SpeechRecognition::SetGrammars(SpeechGrammarList& aArg) {
 
 void SpeechRecognition::GetLang(nsString& aRetVal) const { aRetVal = mLang; }
 
-void SpeechRecognition::SetLang(const nsAString& aArg) { mLang = aArg; }
+void SpeechRecognition::SetLang(const nsAString& aArg) {
+  mLang = aArg;
+}
 
 bool SpeechRecognition::GetContinuous(ErrorResult& aRv) const {
   return mContinuous;
@@ -753,7 +759,9 @@ void SpeechRecognition::SetContinuous(bool aArg, ErrorResult& aRv) {
 
 bool SpeechRecognition::InterimResults() const { return mInterimResults; }
 
-void SpeechRecognition::SetInterimResults(bool aArg) { mInterimResults = aArg; }
+void SpeechRecognition::SetInterimResults(bool aArg) {
+  mInterimResults = aArg;
+}
 
 uint32_t SpeechRecognition::MaxAlternatives() const { return mMaxAlternatives; }
 
@@ -797,6 +805,19 @@ void SpeechRecognition::Start(const Optional<NonNull<DOMMediaStream>>& aStream,
 
   MediaStreamConstraints constraints;
   constraints.mAudio.SetAsBoolean() = true;
+
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+  auto dsServ = static_cast<DSSpeechRecognitionService*>(mRecognitionService.get());
+  dsServ->SetLang(mLang);
+  dsServ->SetContinous(mContinuous);
+  dsServ->SetInterimResults(mInterimResults);
+
+  auto& ac = constraints.mAudio.SetAsMediaTrackConstraints();
+  ac.mEchoCancellation.Construct().SetAsBoolean() = true;
+  ac.mNoiseSuppression.Construct().SetAsBoolean() = true;
+  ac.mAutoGainControl.Construct().SetAsBoolean() = true;
+  ac.mChannelCount.Construct().SetAsLong() = 1;
+#endif
 
   if (aStream.WasPassed()) {
     mStream = &aStream.Value();
@@ -929,11 +950,15 @@ bool SpeechRecognition::ValidateAndSetGrammarList(ErrorResult& aRv) {
 }
 
 void SpeechRecognition::Stop() {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+
   RefPtr<SpeechEvent> event = new SpeechEvent(this, EVENT_STOP);
   NS_DispatchToMainThread(event);
 }
 
 void SpeechRecognition::Abort() {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+
   if (mAborted) {
     return;
   }

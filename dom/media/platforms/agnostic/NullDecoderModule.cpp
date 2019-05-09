@@ -41,6 +41,11 @@ class NullDecoderModule : public PlatformDecoderModule {
     return nullptr;
   }
 
+  already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
+      const CreateDecoderParams& aParams) override {
+    return nullptr;
+  }
+
   bool SupportsMimeType(const nsACString& aMimeType,
                         DecoderDoctorDiagnostics* aDiagnostics) const override {
     return true;

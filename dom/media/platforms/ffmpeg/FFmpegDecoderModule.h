@@ -60,6 +60,11 @@ class FFmpegDecoderModule : public PlatformDecoderModule {
     return decoder.forget();
   }
 
+  already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
+      const CreateDecoderParams& aParams) override {
+    return nullptr;
+  }
+
   bool SupportsMimeType(const nsACString& aMimeType,
                         DecoderDoctorDiagnostics* aDiagnostics) const override {
     AVCodecID videoCodec = FFmpegVideoDecoder<V>::GetCodecId(aMimeType);

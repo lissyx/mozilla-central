@@ -1567,6 +1567,11 @@ void MediaFormatReader::NotifyNewOutput(
                     sample->mDuration.ToMicroseconds(),
                     sample->mKeyframe ? "true" : "false");
             break;
+          case MediaData::Type::SPEECH_DATA:
+            DDLOGPR(DDLogCategory::Log,
+                    "decoded_audio",
+                    "{\"type\":\"SpeechData\"}");
+            break;
         }
       }
       LOGV("Received new %s sample time:%" PRId64 " duration:%" PRId64,

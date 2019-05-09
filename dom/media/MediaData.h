@@ -251,7 +251,7 @@ class MediaData {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaData)
 
-  enum class Type { AUDIO_DATA = 0, VIDEO_DATA, RAW_DATA, NULL_DATA };
+  enum class Type { AUDIO_DATA = 0, VIDEO_DATA, RAW_DATA, NULL_DATA, SPEECH_DATA };
   static const char* TypeToStr(Type aType) {
     switch (aType) {
       case Type::AUDIO_DATA:
@@ -262,6 +262,8 @@ class MediaData {
         return "RAW_DATA";
       case Type::NULL_DATA:
         return "NULL_DATA";
+      case Type::SPEECH_DATA:
+        return "SPEECH_DATA";
       default:
         MOZ_CRASH("bad value");
     }
@@ -340,6 +342,20 @@ class NullData : public MediaData {
       : MediaData(Type::NULL_DATA, aOffset, aTime, aDuration) {}
 
   static const Type sType = Type::NULL_DATA;
+};
+
+// SpeechData is for decoder generating speech with confidence value
+class SpeechData : public MediaData {
+ public:
+  const nsString mTranscription;
+  const float mConfidence;
+
+  SpeechData(const nsString aTranscription, const float aConfidence)
+      : MediaData(Type::SPEECH_DATA),
+        mTranscription(aTranscription),
+        mConfidence(aConfidence) {}
+
+  static const Type sType = Type::SPEECH_DATA;
 };
 
 // Holds chunk a decoded audio frames.

@@ -80,7 +80,6 @@ RefPtr<ShutdownPromise> WMFMediaDataDecoder::ProcessShutdown() {
 RefPtr<MediaDataDecoder::DecodePromise> WMFMediaDataDecoder::Decode(
     MediaRawData* aSample) {
   MOZ_DIAGNOSTIC_ASSERT(!mIsShutDown);
-
   return InvokeAsync<MediaRawData*>(
       mTaskQueue, this, __func__, &WMFMediaDataDecoder::ProcessDecode, aSample);
 }

@@ -18,6 +18,11 @@ class AndroidDecoderModule : public PlatformDecoderModule {
   already_AddRefed<MediaDataDecoder> CreateAudioDecoder(
       const CreateDecoderParams& aParams) override;
 
+  already_AddRefed<MediaDataDecoder> CreateSpeechDecoder(
+      const CreateDecoderParams& aParams) override {
+    return nullptr;
+  }
+
   explicit AndroidDecoderModule(CDMProxy* aProxy = nullptr);
 
   bool SupportsMimeType(const nsACString& aMimeType,

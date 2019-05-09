@@ -482,6 +482,9 @@ class SandboxPolicyCommon : public SandboxPolicyBase {
             .ElseIf(clk_id == CLOCK_REALTIME_COARSE, Allow())
 #endif
             .ElseIf(clk_id == CLOCK_THREAD_CPUTIME_ID, Allow())
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+            .ElseIf(clk_id == CLOCK_MONOTONIC_RAW, Allow())
+#endif
             .Else(InvalidSyscall());
       }
 
