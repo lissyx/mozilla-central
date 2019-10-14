@@ -17,6 +17,7 @@ enum SpeechRecognitionErrorCode {
 
 [Pref="media.webspeech.recognition.enable",
  Func="SpeechRecognition::IsAuthorized",
+ NamedConstructor=webkitSpeechRecognitionError,
  Exposed=Window]
 interface SpeechRecognitionError : Event
 {

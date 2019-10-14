@@ -23,6 +23,13 @@ class SpeechRecognitionError : public Event {
       const GlobalObject& aGlobal, const nsAString& aType,
       const SpeechRecognitionErrorInit& aParam);
 
+  static already_AddRefed<SpeechRecognitionError> WebkitSpeechRecognitionError(
+      const GlobalObject& aGlobal, ErrorResult& aRv) {
+    nsString mType;
+    SpeechRecognitionErrorInit mParam;
+    return Constructor(aGlobal, mType, mParam);
+  }
+
   virtual JSObject* WrapObjectInternal(
       JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override {
     return mozilla::dom::SpeechRecognitionError_Binding::Wrap(aCx, this,
