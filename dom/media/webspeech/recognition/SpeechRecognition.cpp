@@ -192,12 +192,15 @@ JSObject* SpeechRecognition::WrapObject(JSContext* aCx,
 }
 
 bool SpeechRecognition::IsAuthorized(JSContext* aCx, JSObject* aGlobal) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+
   nsCOMPtr<nsIPrincipal> principal = nsContentUtils::ObjectPrincipal(aGlobal);
 
   nsresult rv;
   nsCOMPtr<nsIPermissionManager> mgr =
       do_GetService(NS_PERMISSIONMANAGER_CONTRACTID, &rv);
   if (NS_WARN_IF(NS_FAILED(rv))) {
+  SR_LOG("%s NOT AUTHORIZED", __PRETTY_FUNCTION__);
     return false;
   }
 
@@ -205,16 +208,21 @@ bool SpeechRecognition::IsAuthorized(JSContext* aCx, JSObject* aGlobal) {
   rv = mgr->TestExactPermissionFromPrincipal(
       principal, NS_LITERAL_CSTRING("speech-recognition"), &speechRecognition);
   if (NS_WARN_IF(NS_FAILED(rv))) {
+  SR_LOG("%s NOT AUTHORIZED", __PRETTY_FUNCTION__);
     return false;
   }
 
   bool hasPermission =
       (speechRecognition == nsIPermissionManager::ALLOW_ACTION);
 
-  return (hasPermission ||
+  bool finalRV = (hasPermission ||
           StaticPrefs::media_webspeech_recognition_force_enable() ||
           StaticPrefs::media_webspeech_test_enable()) &&
          StaticPrefs::media_webspeech_recognition_enable();
+
+  SR_LOG("%s finalRV=%d", __PRETTY_FUNCTION__, finalRV);
+
+  return finalRV;
 }
 
 already_AddRefed<SpeechRecognition> SpeechRecognition::Constructor(
@@ -734,37 +742,57 @@ void SpeechRecognition::ProcessTestEventRequest(nsISupports* aSubject,
 }
 
 already_AddRefed<SpeechGrammarList> SpeechRecognition::Grammars() const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   RefPtr<SpeechGrammarList> speechGrammarList = mSpeechGrammarList;
   return speechGrammarList.forget();
 }
 
 void SpeechRecognition::SetGrammars(SpeechGrammarList& aArg) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   mSpeechGrammarList = &aArg;
 }
 
-void SpeechRecognition::GetLang(nsString& aRetVal) const { aRetVal = mLang; }
+void SpeechRecognition::GetLang(nsString& aRetVal) const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  aRetVal = mLang;
+}
 
 void SpeechRecognition::SetLang(const nsAString& aArg) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  SR_LOG("%s aArg=%s", __PRETTY_FUNCTION__, NS_ConvertUTF16toUTF8(aArg).get());
   mLang = aArg;
 }
 
 bool SpeechRecognition::GetContinuous(ErrorResult& aRv) const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   return mContinuous;
 }
 
 void SpeechRecognition::SetContinuous(bool aArg, ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  SR_LOG("%s aArg=%d", __PRETTY_FUNCTION__, aArg);
   mContinuous = aArg;
 }
 
-bool SpeechRecognition::InterimResults() const { return mInterimResults; }
+bool SpeechRecognition::InterimResults() const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  return mInterimResults;
+}
 
 void SpeechRecognition::SetInterimResults(bool aArg) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  SR_LOG("%s aArg=%d", __PRETTY_FUNCTION__, aArg);
   mInterimResults = aArg;
 }
 
-uint32_t SpeechRecognition::MaxAlternatives() const { return mMaxAlternatives; }
+uint32_t SpeechRecognition::MaxAlternatives() const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  return mMaxAlternatives;
+}
 
 void SpeechRecognition::SetMaxAlternatives(uint32_t aArg) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  SR_LOG("%s aArg=%d", __PRETTY_FUNCTION__, aArg);
   mMaxAlternatives = aArg;
 }
 
@@ -774,11 +802,15 @@ void SpeechRecognition::GetServiceURI(nsString& aRetVal,
 }
 
 void SpeechRecognition::SetServiceURI(const nsAString& aArg, ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  SR_LOG("%s aArg=%s", __PRETTY_FUNCTION__, NS_ConvertUTF16toUTF8(aArg).get());
   aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
 }
 
 void SpeechRecognition::Start(const Optional<NonNull<DOMMediaStream>>& aStream,
                               CallerType aCallerType, ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+
   if (mCurrentState != STATE_IDLE) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
@@ -882,6 +914,8 @@ void SpeechRecognition::Start(const Optional<NonNull<DOMMediaStream>>& aStream,
 }
 
 bool SpeechRecognition::SetRecognitionService(ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+
   if (!GetOwner()) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return false;
@@ -927,6 +961,8 @@ bool SpeechRecognition::SetRecognitionService(ErrorResult& aRv) {
 }
 
 bool SpeechRecognition::ValidateAndSetGrammarList(ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+
   if (!mSpeechGrammarList) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return false;

@@ -111,6 +111,18 @@ class SpeechRecognition final : public DOMEventTargetHelper,
 
   void Abort();
 
+#undef IMPL_EVENT_HANDLER
+// WebIDL event handlers
+#define IMPL_EVENT_HANDLER(_event)                                          \
+  inline mozilla::dom::EventHandlerNonNull* GetOn##_event() {               \
+    SR_LOG("%s", __PRETTY_FUNCTION__);                                      \
+    return GetEventHandler(nsGkAtoms::on##_event);                          \
+  }                                                                         \
+  inline void SetOn##_event(mozilla::dom::EventHandlerNonNull* aCallback) { \
+    SR_LOG("%s", __PRETTY_FUNCTION__);                                      \
+    SetEventHandler(nsGkAtoms::on##_event, aCallback);                      \
+  }
+
   IMPL_EVENT_HANDLER(audiostart)
   IMPL_EVENT_HANDLER(soundstart)
   IMPL_EVENT_HANDLER(speechstart)

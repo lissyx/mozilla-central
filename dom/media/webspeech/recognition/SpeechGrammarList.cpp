@@ -28,6 +28,7 @@ SpeechGrammarList::~SpeechGrammarList() = default;
 
 already_AddRefed<SpeechGrammarList> SpeechGrammarList::Constructor(
     const GlobalObject& aGlobal) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   RefPtr<SpeechGrammarList> speechGrammarList =
       new SpeechGrammarList(aGlobal.GetAsSupports());
   return speechGrammarList.forget();
@@ -40,10 +41,14 @@ JSObject* SpeechGrammarList::WrapObject(JSContext* aCx,
 
 nsISupports* SpeechGrammarList::GetParentObject() const { return mParent; }
 
-uint32_t SpeechGrammarList::Length() const { return mItems.Length(); }
+uint32_t SpeechGrammarList::Length() const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
+  return mItems.Length();
+}
 
 already_AddRefed<SpeechGrammar> SpeechGrammarList::Item(uint32_t aIndex,
                                                         ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   RefPtr<SpeechGrammar> result = mItems.ElementAt(aIndex);
   return result.forget();
 }
@@ -51,12 +56,14 @@ already_AddRefed<SpeechGrammar> SpeechGrammarList::Item(uint32_t aIndex,
 void SpeechGrammarList::AddFromURI(const nsAString& aSrc,
                                    const Optional<float>& aWeight,
                                    ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
 }
 
 void SpeechGrammarList::AddFromString(const nsAString& aString,
                                       const Optional<float>& aWeight,
                                       ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   SpeechGrammar* speechGrammar = new SpeechGrammar(mParent);
   speechGrammar->SetSrc(aString, aRv);
   mItems.AppendElement(speechGrammar);
@@ -64,6 +71,7 @@ void SpeechGrammarList::AddFromString(const nsAString& aString,
 
 already_AddRefed<SpeechGrammar> SpeechGrammarList::IndexedGetter(
     uint32_t aIndex, bool& aPresent, ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   if (aIndex >= Length()) {
     aPresent = false;
     return nullptr;

@@ -25,6 +25,7 @@ SpeechGrammar::~SpeechGrammar() = default;
 
 already_AddRefed<SpeechGrammar> SpeechGrammar::Constructor(
     const GlobalObject& aGlobal) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   RefPtr<SpeechGrammar> speechGrammar =
       new SpeechGrammar(aGlobal.GetAsSupports());
   return speechGrammar.forget();
@@ -38,19 +39,23 @@ JSObject* SpeechGrammar::WrapObject(JSContext* aCx,
 }
 
 void SpeechGrammar::GetSrc(nsString& aRetVal, ErrorResult& aRv) const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   aRetVal = mSrc;
 }
 
 void SpeechGrammar::SetSrc(const nsAString& aArg, ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   mSrc = aArg;
 }
 
 float SpeechGrammar::GetWeight(ErrorResult& aRv) const {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
   return 0;
 }
 
 void SpeechGrammar::SetWeight(float aArg, ErrorResult& aRv) {
+  SR_LOG("%s", __PRETTY_FUNCTION__);
   aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
 }
 
