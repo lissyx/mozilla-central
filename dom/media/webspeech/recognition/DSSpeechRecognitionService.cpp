@@ -23,6 +23,7 @@
 #include "mozilla/gfx/gfxVars.h"
 
 #include "MediaSegment.h"
+#include "MediaInfo.h"
 
 namespace mozilla {
 
@@ -460,6 +461,15 @@ DSSpeechRecognitionService::SetLang(const nsAString& aLang) {
       beamWidth,
       lmAlpha,
       lmBeta);
+
+  RefPtr<PDMFactory> platform;
+  platform = new PDMFactory();
+
+  const AudioInfo mAudio;
+  const CreateDecoderParams mParams(mAudio, CreateDecoderParams::UseSpeechDecoder(true));
+
+  RefPtr<MediaDataDecoder> mDecoder;
+  mDecoder = platform->CreateDecoder(mParams);
 
   mThreadPool->Dispatch(dsThread, NS_DISPATCH_NORMAL);
 

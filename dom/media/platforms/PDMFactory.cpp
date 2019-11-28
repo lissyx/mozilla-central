@@ -20,6 +20,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/GpuDecoderModule.h"
 #include "mozilla/RemoteDecoderModule.h"
+#include "mozilla/SpeechDecoderModule.h"
 #include "mozilla/SharedThreadPool.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "mozilla/StaticPtr.h"
@@ -286,7 +287,8 @@ already_AddRefed<MediaDataDecoder> PDMFactory::CreateDecoderWithPDM(
 
   if ((MP4Decoder::IsH264(config.mMimeType) ||
        VPXDecoder::IsVPX(config.mMimeType)) &&
-      !aParams.mUseNullDecoder.mUse && !aParams.mNoWrapper.mDontUseWrapper) {
+      !aParams.mUseNullDecoder.mUse &&
+      !aParams.mNoWrapper.mDontUseWrapper) {
     RefPtr<MediaChangeMonitor> h = new MediaChangeMonitor(aPDM, aParams);
     const MediaResult result = h->GetLastError();
     if (NS_SUCCEEDED(result) || result == NS_ERROR_NOT_INITIALIZED) {
@@ -389,6 +391,11 @@ void PDMFactory::CreatePDMs() {
     m = new AndroidDecoderModule();
     StartupPDM(m, StaticPrefs::media_android_media_codec_preferred());
   }
+#endif
+
+#ifdef MOZ_WEBSPEECH_DS_BACKEND
+  RefPtr<PlatformDecoderModule> sRemote = new SpeechDecoderModule();
+  StartupPDM(sRemote);
 #endif
 
   m = new AgnosticDecoderModule();

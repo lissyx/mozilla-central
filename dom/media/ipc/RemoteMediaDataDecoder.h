@@ -28,6 +28,7 @@ class RemoteMediaDataDecoder
       public DecoderDoctorLifeLogger<RemoteMediaDataDecoder> {
  public:
   friend class GpuDecoderModule;
+  friend class SpeechDecoderModule;
   friend class RemoteDecoderModule;
 
   // MediaDataDecoder

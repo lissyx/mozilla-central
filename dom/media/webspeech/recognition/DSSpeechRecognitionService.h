@@ -13,6 +13,7 @@
 #include "nsProxyRelease.h"
 #include "nsThreadUtils.h"
 #include "nsTextFormatter.h"
+#include "PDMFactory.h"
 
 #include "mozilla/Monitor.h"
 #include "mozilla/SharedThreadPool.h"

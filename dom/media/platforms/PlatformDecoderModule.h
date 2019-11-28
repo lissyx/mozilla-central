@@ -66,6 +66,12 @@ struct MOZ_STACK_CLASS CreateDecoderParams final {
     bool mUse = false;
   };
 
+  struct UseSpeechDecoder {
+    UseSpeechDecoder() = default;
+    explicit UseSpeechDecoder(bool aUseSpeechDecoder) : mUse(aUseSpeechDecoder) {}
+    bool mUse = false;
+  };
+
   // Do not wrap H264 decoder in a H264Converter.
   struct NoWrapper {
     NoWrapper() = default;
@@ -111,6 +117,7 @@ struct MOZ_STACK_CLASS CreateDecoderParams final {
   RefPtr<layers::KnowsCompositor> mKnowsCompositor;
   RefPtr<GMPCrashHelper> mCrashHelper;
   UseNullDecoder mUseNullDecoder;
+  UseSpeechDecoder mUseSpeechDecoder;
   NoWrapper mNoWrapper;
   TrackInfo::TrackType mType = TrackInfo::kUndefinedTrack;
   MediaEventProducer<TrackInfo::TrackType>* mOnWaitingForKeyEvent = nullptr;
@@ -129,6 +136,9 @@ struct MOZ_STACK_CLASS CreateDecoderParams final {
   void Set(GMPCrashHelper* aCrashHelper) { mCrashHelper = aCrashHelper; }
   void Set(UseNullDecoder aUseNullDecoder) {
     mUseNullDecoder = aUseNullDecoder;
+  }
+  void Set(UseSpeechDecoder aUseSpeechDecoder) {
+    mUseSpeechDecoder = aUseSpeechDecoder;
   }
   void Set(NoWrapper aNoWrapper) { mNoWrapper = aNoWrapper; }
   void Set(OptionSet aOptions) { mOptions = aOptions; }

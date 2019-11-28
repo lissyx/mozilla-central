@@ -38,9 +38,16 @@ struct RemoteAudioDataIPDL
   Shmem buffer;
 };
 
+struct RemoteSpeechDataIPDL
+{
+  MediaDataIPDL base;
+  nsCString transcription;
+};
+
 union DecodedOutputIPDL
 {
   RemoteAudioDataIPDL[];
+  RemoteSpeechDataIPDL[];
   RemoteVideoDataIPDL[];
 };
 

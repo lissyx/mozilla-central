@@ -26,6 +26,7 @@ EXPORTS.mozilla += [
     'RemoteDecoderModule.h',
     'RemoteDecoderParent.h',
     'RemoteMediaDataDecoder.h',
+    'SpeechDecoderModule.h',
 ]
 
 EXPORTS.mozilla.dom += [
@@ -46,7 +47,9 @@ SOURCES += [
     'RemoteDecoderModule.cpp',
     'RemoteDecoderParent.cpp',
     'RemoteMediaDataDecoder.cpp',
+    'RemoteSpeechDecoder.cpp',
     'RemoteVideoDecoder.cpp',
+    'SpeechDecoderModule.cpp',
 ]
 
 # so we can include nsMacUtilsImpl.h in RDDParent.cpp for sandboxing
