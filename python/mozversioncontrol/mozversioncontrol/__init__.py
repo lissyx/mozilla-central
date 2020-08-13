@@ -582,7 +582,7 @@ class GitRepository(Repository):
 
         self._run('-c', 'commit.gpgSign=false', 'commit', '--allow-empty', '-m', message)
         try:
-            subprocess.check_call((self._tool, 'push', 'hg::ssh://hg.mozilla.org/kaios-try',
+            subprocess.check_call((self._tool, 'push', 'hg::ssh://hg.mozilla.org/projects/kaios-try',
                                    '+HEAD:refs/heads/branches/default/tip'), cwd=self.path)
         finally:
             self._run('reset', 'HEAD~')
